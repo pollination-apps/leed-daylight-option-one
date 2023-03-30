@@ -77,7 +77,7 @@ def process_summary(summary: dict):
         color = 'Gray'
     credit_text = f'<h2 style="color:{color}">LEED Credits: {points} points</h2>'
     st.markdown(credit_text, unsafe_allow_html=True)
-    
+
     # sda
     sda = summary['sda']
     sda_text = f'Spatial Daylight Autonomy: {round(sda, 2)}%'
@@ -91,11 +91,13 @@ def process_summary(summary: dict):
     # total floor area / total sensor count
     if 'total_floor_area' in summary:
         floor_area_passing_sda = summary['floor_area_passing_sda']
-        floor_area_passing_sda_text = f'Floor area passing sDA: {round(floor_area_passing_sda, 2)}'
+        floor_area_passing_sda_text = \
+            f'Floor area passing sDA: {round(floor_area_passing_sda, 2)}'
         st.markdown(floor_area_passing_sda_text)
 
         floor_area_passing_ase = summary['floor_area_passing_ase']
-        floor_area_passing_ase_text = f'Floor area passing ASE: {round(floor_area_passing_ase, 2)}'
+        floor_area_passing_ase_text = \
+            f'Floor area passing ASE: {round(floor_area_passing_ase, 2)}'
         st.markdown(floor_area_passing_ase_text)
 
         total_floor_area = summary['total_floor_area']
@@ -103,15 +105,18 @@ def process_summary(summary: dict):
         st.markdown(total_floor_area_text)
     else:
         sensor_count_passing_sda = summary['sensor_count_passing_sda']
-        sensor_count_passing_sda_text = f'Sensor count passing sDA: {round(sensor_count_passing_sda, 2)}'
+        sensor_count_passing_sda_text = \
+            f'Sensor count passing sDA: {round(sensor_count_passing_sda, 2)}'
         st.markdown(sensor_count_passing_sda_text)
 
         sensor_count_passing_ase = summary['sensor_count_passing_ase']
-        sensor_count_passing_ase_text = f'Sensor count passing ASE: {round(sensor_count_passing_ase, 2)}'
+        sensor_count_passing_ase_text = \
+            f'Sensor count passing ASE: {round(sensor_count_passing_ase, 2)}'
         st.markdown(sensor_count_passing_ase_text)
 
         total_sensor_count = summary['total_sensor_count']
-        total_sensor_count_text = f'Total sensor count: {round(total_sensor_count, 2)}'
+        total_sensor_count_text = \
+            f'Total sensor count: {round(total_sensor_count, 2)}'
         st.markdown(total_sensor_count_text)
 
 
@@ -132,7 +137,7 @@ def show_warnings_and_errors(
                 'floor area receiving direct illuminance of 1000 lux or more. '
                 'For LEED compliance it is a requirement that this target is '
                 'met for all hours.')
-                 
+
             grids_ids = list(states_schedule_err.keys())
 
             if not 'show_all_grids' in st.session_state:
@@ -160,7 +165,7 @@ def show_warnings_and_errors(
                 on_change=multiselect_grids, args=(grids_ids,),
                 key='select_grids'
             )
-            
+
             for grid_id in st.session_state['select_grids']:
                 figure_grids(grid_id, states_schedule_err)
 
@@ -174,7 +179,7 @@ def show_warnings_and_errors(
 def process_space(summary_grid: dict):
     st.header('Space by space breakdown')
     df = pd.DataFrame.from_dict(summary_grid).transpose()
-    
+
     try:
         df = df[
             ['ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda', 'total_floor_area']
@@ -279,7 +284,7 @@ def process_ase(folder: Path):
         on_change=multiselect_ase, args=(grid_ids,),
         key='select_ase'
     )
-    
+
     legend_min, legend_max = st.columns(2)
     if not 'legend_min' in st.session_state:
         st.session_state['legend_min'] = float(0)
@@ -305,7 +310,7 @@ def select_menu(api_client: ApiClient, user: dict):
             api_client,
             default_account_username=username
         )
-        
+
         if account:
             st.subheader('Hi ' + username + ', select a project:')
             if 'owner' in account:
@@ -314,10 +319,13 @@ def select_menu(api_client: ApiClient, user: dict):
             project = select_project(
                 'select-project',
                 api_client,
-                project_owner=username
+                project_owner=username,
+                default_project_id=st.session_state['project_id']
             )
 
             if project and 'name' in project:
+                st.session_state['project_id'] = project['id']
+
                 st.subheader('Select a study:')
                 study = select_study(
                     'select-study',
@@ -325,9 +333,11 @@ def select_menu(api_client: ApiClient, user: dict):
                     project_name=project['name'],
                     project_owner=username
                 )
-                
+
                 if study and 'id' in study:
-                    st.subheader('Select a run for study ' + study['id'] + ' :')
+                    st.session_state['study_id'] = study['id']
+
+                    st.subheader('Select a run:')
                     run = select_run(
                         'select-run',
                         api_client,
@@ -335,13 +345,21 @@ def select_menu(api_client: ApiClient, user: dict):
                         project_owner=username,
                         job_id=study['id']
                     )
-                    
+
                     if run is not None:
+                        st.session_state['run_id'] = run['id']
+
                         project_owner = username
                         project_name = project['name']
                         job_id = study['id']
                         run_id = run['id']
-                        run = Run(project_owner, project_name, job_id, run_id, api_client)
-                        return run
+                        run = Run(project_owner, project_name,
+                                  job_id, run_id, api_client)
+                        run_url = (f'{run._client.host}/{run.owner}/projects/'
+                            f'{run.project}/studies/{run.job_id}/runs/{run.id}')
+                        st.experimental_set_query_params(url=run_url)
+                        st.session_state.run_url = run_url
+                        st.session_state.active_option = 'Load from a URL'
+                        st.session_state['run'] = run
                     else:
-                        return None
+                        st.session_state['run'] = None

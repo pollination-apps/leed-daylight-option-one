@@ -1,7 +1,6 @@
 streamlit==1.17.0
 honeybee-display[full]==0.2.17
 ladybug-charts==1.18.8
-pollination-streamlit>=0.5.2
-pollination_streamlit_io>=0.49.0
-pollination_streamlit_viewer==0.4.7
+pollination_streamlit_io>=0.51.3
+pollination_streamlit_viewer==0.4.8
 honeybee-radiance==1.64.150
