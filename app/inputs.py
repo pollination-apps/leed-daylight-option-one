@@ -11,3 +11,25 @@ def initialize():
         st.session_state['select_aperture_groups'] = []
     if not 'select_grids' in st.session_state:
         st.session_state['select_grids'] = []
+
+    if 'active_option' not in st.session_state:
+        st.session_state.active_option = 'Load from a project'
+    if 'options' not in st.session_state:
+        st.session_state.options = [
+            'Load from a project', 'Load from a URL', 'Try the sample run'
+        ]
+    query_params = st.experimental_get_query_params()
+    if 'load_method' not in st.session_state:
+        if 'url' in query_params:
+            st.session_state.active_option = 'Load from a URL'
+            st.session_state.run_url = query_params['url'][0]
+    if 'run_url' not in st.session_state:
+        st.session_state.run_url = None
+    if 'run' not in st.session_state:
+        st.session_state.run = None
+    if 'project_id' not in st.session_state:
+        st.session_state.project_id = None
+    if 'study_id' not in st.session_state:
+        st.session_state.study_id = None
+    if 'run_id' not in st.session_state:
+        st.session_state.run_id = None
