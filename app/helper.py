@@ -66,7 +66,8 @@ def download_files(run: Run) -> None:
     vtk_vs = VTKVisualizationSet.from_visualization_set(vs)
     vtjks_file = Path(vtk_vs.to_vtkjs(folder=data_folder, name='vis_set'))
 
-    return leed_summary_folder, vtjks_file, summary, summary_grid, states_schedule, states_schedule_err
+    return (leed_summary_folder, vtjks_file, summary, summary_grid,
+            states_schedule, states_schedule_err)
 
 
 def process_summary(summary: dict):
@@ -182,7 +183,8 @@ def process_space(summary_grid: dict):
 
     try:
         df = df[
-            ['ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda', 'total_floor_area']
+            ['ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda',
+             'total_floor_area']
             ]
         # rename columns
         df.rename(
@@ -195,7 +197,8 @@ def process_space(summary_grid: dict):
                 }, inplace=True)
     except Exception:
         df = df[
-            ['ase', 'sda', 'sensor_count_passing_ase', 'sensor_count_passing_sda', 'total_sensor_count']
+            ['ase', 'sda', 'sensor_count_passing_ase',
+             'sensor_count_passing_sda', 'total_sensor_count']
             ]
         # rename columns
         df.rename(
@@ -302,6 +305,7 @@ def process_ase(folder: Path):
     for grid_id in st.session_state['select_ase']:
         figure_ase(grid_id, results_folder)
 
+
 def select_menu(api_client: ApiClient, user: dict):
     if user and 'username' in user:
         username = user['username']
@@ -356,10 +360,33 @@ def select_menu(api_client: ApiClient, user: dict):
                         run = Run(project_owner, project_name,
                                   job_id, run_id, api_client)
                         run_url = (f'{run._client.host}/{run.owner}/projects/'
-                            f'{run.project}/studies/{run.job_id}/runs/{run.id}')
+                                   f'{run.project}/studies/{run.job_id}/runs/'
+                                   f'{run.id}')
                         st.experimental_set_query_params(url=run_url)
                         st.session_state.run_url = run_url
                         st.session_state.active_option = 'Load from a URL'
                         st.session_state['run'] = run
                     else:
                         st.session_state['run'] = None
+
+
+def load_sample():
+    sample_folder = Path(f'{st.session_state.target_folder}/sample')
+    leed_summary_folder = sample_folder.joinpath('leed-summary')
+
+    with open(leed_summary_folder.joinpath('summary.json')) as json_file:
+        summary = json.load(json_file)
+    with open(leed_summary_folder.joinpath('summary_grid.json')) as json_file:
+        summary_grid = json.load(json_file)
+    with open(leed_summary_folder.joinpath('states_schedule.json')) as json_file:
+        states_schedule = json.load(json_file)
+    if leed_summary_folder.joinpath('states_schedule_err.json').is_file():
+        with open(leed_summary_folder.joinpath('states_schedule_err.json')) as json_file:
+            states_schedule_err = json.load(json_file)
+    else:
+        states_schedule_err = None
+
+    vtjks_file = Path(sample_folder, 'vis_set.vtkjs')
+
+    return (leed_summary_folder, vtjks_file, summary, summary_grid,
+            states_schedule, states_schedule_err)

@@ -8,7 +8,7 @@ from pollination_streamlit_viewer import viewer
 
 from helper import (download_files, process_summary,
     show_warnings_and_errors, process_space, process_states_schedule,
-    process_ase, select_menu)
+    process_ase, select_menu, load_sample)
 from inputs import initialize
 
 
@@ -25,12 +25,12 @@ def main():
     initialize()
 
     # set up tabs
-    run_tab, summary_tab, space_tab, states_schedule_tab, dir_ill_tab, visualization_tab = \
-        st.tabs(['Get run', 'Summary report', 'Space by space breakdown',
+    study_tab, summary_tab, space_tab, states_schedule_tab, dir_ill_tab, visualization_tab = \
+        st.tabs(['Select a study', 'Summary report', 'Space by space breakdown',
              'States schedule', 'Direct Illuminance', 'Visualization']
         )
 
-    with run_tab:
+    with study_tab:
         st.radio(
             'Load method', options=st.session_state.options,
             horizontal=True, label_visibility='collapsed', key='load_method',
@@ -51,7 +51,8 @@ def main():
                 st.session_state['run'] = run
         else:
             # get sample files
-            st.stop('No sample project yet.')
+            folder, vtjks_file, summary, summary_grid, states_schedule, \
+                states_schedule_err = load_sample()
 
     if st.session_state['run'] is not None \
             or st.session_state['load_method'] == 'Try the sample run':
@@ -70,7 +71,7 @@ def main():
                 )
                 st.stop()
             if version.parse(run.recipe.tag) < version.parse('0.0.14'):
-                with run_tab:
+                with study_tab:
                     st.error(
                         'Only versions pollination/leed-daylight-option-one:0.0.14 or higher '
                         f'are valid. Current version of the recipe: {run.recipe.tag}.'
