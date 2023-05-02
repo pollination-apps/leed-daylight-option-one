@@ -11,6 +11,7 @@ from pollination_streamlit.api.client import ApiClient
 from pollination_streamlit_io import (select_account, select_project,
     select_study, select_run)
 from honeybee_display.model import model_to_vis_set
+from ladybug.datacollection import HourlyContinuousCollection
 from ladybug_vtk.visualization_set import VisualizationSet as VTKVisualizationSet
 
 from on_change import (radio_show_all_grids, radio_show_all,
@@ -50,7 +51,7 @@ def download_files(run: Run) -> None:
         with open(leed_summary_folder.joinpath('states_schedule_err.json')) as json_file:
             states_schedule_err = json.load(json_file)
     else:
-        states_schedule_err = None
+        states_schedule_err = {}
 
     results_folder = leed_summary_folder.joinpath('results')
     metric_info_dict = _leed_daylight_option_one_vis_metadata()
@@ -126,7 +127,7 @@ def show_warnings_and_errors(
     # display warnings and errors
     if 'note' in summary:
         st.error(summary['note'])
-    if states_schedule_err is not None:
+    if bool(states_schedule_err):
         states_schedule_err_label = (
             'Hours where 2% of the floor area receives direct illuminance of '
             '1000 lux or more.'
@@ -248,7 +249,9 @@ def process_states_schedule(states_schedule: dict):
     )
 
     for aperture_group in st.session_state['select_aperture_groups']:
-        figure_aperture_group_schedule(aperture_group, states_schedule)
+        datacollection = \
+            HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
+        figure_aperture_group_schedule(aperture_group, datacollection)
 
 
 def process_ase(folder: Path):
@@ -384,7 +387,7 @@ def load_sample():
         with open(leed_summary_folder.joinpath('states_schedule_err.json')) as json_file:
             states_schedule_err = json.load(json_file)
     else:
-        states_schedule_err = None
+        states_schedule_err = {}
 
     vtjks_file = Path(sample_folder, 'vis_set.vtkjs')
 

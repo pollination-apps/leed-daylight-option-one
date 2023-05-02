@@ -44,7 +44,7 @@ def figure_grids(grid_id: str, states_schedule_err: dict):
 
     category = ["Pass", "Fail"]
     df["pass/fail"] = [category[int(value)] for value in df["value"]]
-    
+
     fig = go.Figure(
         data=go.Heatmap(
             y=df["hour"],
@@ -69,7 +69,7 @@ def figure_grids(grid_id: str, states_schedule_err: dict):
             )
         )
     )
-    
+
     # add horizontal lines marking the occupancy schedule
     fig.add_hline(y=7.5, line_dash='dash', line_width=1, line_color='black')
     fig.add_hline(y=17.5, line_dash='dash', line_width=1, line_color='black')
@@ -97,23 +97,19 @@ def figure_grids(grid_id: str, states_schedule_err: dict):
     st.plotly_chart(fig, use_container_width=True, config=get_figure_config(grid_id))
 
 
-def figure_aperture_group_schedule(aperture_group: str, states_schedule: dict):
-    st_schedule = states_schedule[aperture_group]
-    data_type = DataTypeBase(aperture_group)
-    analysis_period = AnalysisPeriod()
-    header = Header(data_type=data_type, unit=None, analysis_period=analysis_period)
-    hourly_data = HourlyContinuousCollection(header=header, values=st_schedule)
+def figure_aperture_group_schedule(aperture_group: str,
+    states_schedule: HourlyContinuousCollection):
 
     df = dataframe()
-    series = Series(hourly_data)
+    series = Series(states_schedule)
     df["value"] = series.values
 
     category = ['Shading off', 'Shading on']
-    
-    shd_trans = sorted(df['value'].unique().data)
-    df['value'] = df['value'].replace(1, 0).replace(shd_trans[1], 1)
+
+    shd_trans = states_schedule.header.metadata['Shade Transmittance']
+    #df['value'] = df['value'].replace(1, 0).replace(shd_trans, 1)
     df['shading'] = [category[int(value)] for value in df['value']]
-    
+
     fig = go.Figure(
         data=go.Heatmap(
             y=df["hour"],
@@ -126,7 +122,7 @@ def figure_aperture_group_schedule(aperture_group: str, states_schedule: dict):
             hovertemplate=(
                 "<b>"
                 + aperture_group
-                + ": %{customdata[2]} - " + "{:.0%}".format(round(shd_trans[1], 3))
+                + ": %{customdata[2]} - " + "{:.0%}".format(round(shd_trans, 3))
                 + "</b><br>Month: %{customdata[0]}<br>Day: %{customdata[1]}<br>"
                 + "Hour: %{y}:00<br>"
             ),
@@ -138,7 +134,7 @@ def figure_aperture_group_schedule(aperture_group: str, states_schedule: dict):
             )
         )
     )
-    
+
     # add horizontal lines marking the standard LEED occupancy schedule
     fig.add_hline(y=7.5, line_dash='dash', line_width=1, line_color='black')
     fig.add_hline(y=17.5, line_dash='dash', line_width=1, line_color='black')
@@ -146,7 +142,7 @@ def figure_aperture_group_schedule(aperture_group: str, states_schedule: dict):
     fig.update_yaxes(title_text="Hours of the day")
 
     fig_title = {
-        'text': aperture_group + ' - Shading transmittance: ' + '{:.0%}'.format(round(shd_trans[1], 3)),
+        'text': aperture_group + ' - Shading transmittance: ' + '{:.0%}'.format(round(shd_trans, 3)),
         'y': 1,
         'x': 0.5,
         'xanchor': 'center',
@@ -167,15 +163,14 @@ def figure_aperture_group_schedule(aperture_group: str, states_schedule: dict):
 
 
 def figure_ase(grid_id: str, results_folder: Path):
-    data_type = DataTypeBase(grid_id)
-    with open (results_folder.joinpath(f'{grid_id}.pct')) as file:
+    with open (results_folder.joinpath(f'{grid_id}.json')) as file:
         data_dict = json.load(file)
     hourly_data = HourlyContinuousCollection.from_dict(data_dict)
 
     df = dataframe()
     series = Series(hourly_data)
     df["value"] = series.values
-    
+
     colors = Colorset.original()
 
     fig = go.Figure(
@@ -201,7 +196,7 @@ def figure_ase(grid_id: str, results_folder: Path):
             )
         )
     )
-    
+
     # add horizontal lines marking the occupancy schedule
     fig.add_hline(y=7.5, line_dash='dash', line_width=1, line_color='black')
     fig.add_hline(y=17.5, line_dash='dash', line_width=1, line_color='black')

@@ -7,13 +7,13 @@
     "full_id": "Room_1",
     "light_path": [
       [
-        "Room_1_Skylight"
+        "Room_1_ApertureGroup_0"
       ],
       [
-        "Room_1_North"
+        "Room_1_ApertureGroup_1"
       ],
       [
-        "Room_1_East"
+        "Room_1_ApertureGroup_2"
       ]
     ]
   },
@@ -25,13 +25,13 @@
     "full_id": "Room_2",
     "light_path": [
       [
-        "Room_2_East"
+        "Room_2_ApertureGroup_0"
       ],
       [
-        "Room_2_South"
+        "Room_2_ApertureGroup_1"
       ],
       [
-        "Room_2_South_Upper"
+        "Room_2_ApertureGroup_2"
       ]
     ]
   },
@@ -43,10 +43,10 @@
     "full_id": "Room_3",
     "light_path": [
       [
-        "Room_3_South"
+        "Room_3_ApertureGroup_0"
       ],
       [
-        "Room_3_South_Upper"
+        "Room_3_ApertureGroup_1"
       ]
     ]
   },
@@ -58,10 +58,10 @@
     "full_id": "Room_4",
     "light_path": [
       [
-        "Room_4_East"
+        "Room_4_ApertureGroup_0"
       ],
       [
-        "Room_4_North"
+        "Room_4_ApertureGroup_1"
       ]
     ]
   },
@@ -73,13 +73,13 @@
     "full_id": "Room_5",
     "light_path": [
       [
-        "Room_5_Skylight"
+        "Room_5_ApertureGroup_0"
       ],
       [
-        "Room_5_North"
+        "Room_5_ApertureGroup_1"
       ],
       [
-        "Room_5_East"
+        "Room_5_ApertureGroup_2"
       ]
     ]
   },
@@ -91,10 +91,10 @@
     "full_id": "Room_6",
     "light_path": [
       [
-        "Room_6_South"
+        "Room_6_ApertureGroup_0"
       ],
       [
-        "Room_6_South_Upper"
+        "Room_6_ApertureGroup_1"
       ]
     ]
   },
@@ -106,13 +106,13 @@
     "full_id": "Room_7",
     "light_path": [
       [
-        "Room_7_Skylight"
+        "Room_7_ApertureGroup_0"
       ],
       [
-        "Room_7_North"
+        "Room_7_ApertureGroup_1"
       ],
       [
-        "Room_7_East"
+        "Room_7_ApertureGroup_2"
       ]
     ]
   },
@@ -124,10 +124,10 @@
     "full_id": "Room_8",
     "light_path": [
       [
-        "Room_8_West"
+        "Room_8_ApertureGroup_0"
       ],
       [
-        "Room_8_North"
+        "Room_8_ApertureGroup_1"
       ]
     ]
   },
@@ -139,13 +139,13 @@
     "full_id": "Room_9",
     "light_path": [
       [
-        "Room_9_Skylight"
+        "Room_9_ApertureGroup_0"
       ],
       [
-        "Room_9_North"
+        "Room_9_ApertureGroup_1"
       ],
       [
-        "Room_9_West"
+        "Room_9_ApertureGroup_2"
       ]
     ]
   },
@@ -157,10 +157,10 @@
     "full_id": "Room_10",
     "light_path": [
       [
-        "Room_10_South"
+        "Room_10_ApertureGroup_0"
       ],
       [
-        "Room_10_South_Upper"
+        "Room_10_ApertureGroup_1"
       ]
     ]
   },
@@ -172,10 +172,10 @@
     "full_id": "Room_11",
     "light_path": [
       [
-        "Room_11_South"
+        "Room_11_ApertureGroup_0"
       ],
       [
-        "Room_11_South_Upper"
+        "Room_11_ApertureGroup_1"
       ]
     ]
   },
@@ -187,10 +187,10 @@
     "full_id": "Room_12",
     "light_path": [
       [
-        "Room_12_East"
+        "Room_12_ApertureGroup_0"
       ],
       [
-        "Room_12_North"
+        "Room_12_ApertureGroup_1"
       ]
     ]
   },
@@ -202,13 +202,13 @@
     "full_id": "Room_13",
     "light_path": [
       [
-        "Room_13_Skylight"
+        "Room_13_ApertureGroup_0"
       ],
       [
-        "Room_13_North"
+        "Room_13_ApertureGroup_1"
       ],
       [
-        "Room_13_East"
+        "Room_13_ApertureGroup_2"
       ]
     ]
   },
@@ -220,13 +220,13 @@
     "full_id": "Room_14",
     "light_path": [
       [
-        "Room_14_Skylight"
+        "Room_14_ApertureGroup_0"
       ],
       [
-        "Room_14_North"
+        "Room_14_ApertureGroup_1"
       ],
       [
-        "Room_14_West"
+        "Room_14_ApertureGroup_2"
       ]
     ]
   },
@@ -238,13 +238,13 @@
     "full_id": "Room_15",
     "light_path": [
       [
-        "Room_15_Skylight"
+        "Room_15_ApertureGroup_0"
       ],
       [
-        "Room_15_North"
+        "Room_15_ApertureGroup_1"
       ],
       [
-        "Room_15_East"
+        "Room_15_ApertureGroup_2"
       ]
     ]
   },
@@ -256,10 +256,10 @@
     "full_id": "Room_16",
     "light_path": [
       [
-        "Room_16_South"
+        "Room_16_ApertureGroup_0"
       ],
       [
-        "Room_16_South_Upper"
+        "Room_16_ApertureGroup_1"
       ]
     ]
   },
@@ -271,10 +271,10 @@
     "full_id": "Room_17",
     "light_path": [
       [
-        "Room_17_South"
+        "Room_17_ApertureGroup_0"
       ],
       [
-        "Room_17_South_Upper"
+        "Room_17_ApertureGroup_1"
       ]
     ]
   }
