@@ -7,6 +7,8 @@ def initialize():
     # initialize session state variables
     if 'target_folder' not in st.session_state:
         st.session_state.target_folder = Path(__file__).parent
+    if 'data_folder' not in st.session_state:
+        st.session_state.data_folder = st.session_state.target_folder.joinpath('data')
     if not 'select_aperture_groups' in st.session_state:
         st.session_state['select_aperture_groups'] = []
     if not 'select_grids' in st.session_state:

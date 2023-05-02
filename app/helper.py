@@ -32,15 +32,13 @@ def download_files(run: Run) -> None:
     model_dict = json.load(run.job.download_artifact(info.model))
     hb_model = Model.from_dict(model_dict)
 
-    data_folder = Path(f'{st.session_state.target_folder}/data')
-    leed_summary_folder = data_folder.joinpath('leed-summary')
+    run_folder = st.session_state.data_folder.joinpath(run.id)
+    leed_summary_folder = run_folder.joinpath('leed-summary')
 
     output = run.download_zipped_output('leed-summary')
     with zipfile.ZipFile(output) as zip_folder:
         zip_folder.extractall(leed_summary_folder)
 
-    grids_info = leed_summary_folder.joinpath('grids_info.json')
-    grids_info.unlink() # remove later
     with open(leed_summary_folder.joinpath('summary.json')) as json_file:
         summary = json.load(json_file)
     with open(leed_summary_folder.joinpath('summary_grid.json')) as json_file:
@@ -65,7 +63,7 @@ def download_files(run: Run) -> None:
         grid_data_path=str(results_folder), active_grid_data='da'
     )
     vtk_vs = VTKVisualizationSet.from_visualization_set(vs)
-    vtjks_file = Path(vtk_vs.to_vtkjs(folder=data_folder, name='vis_set'))
+    vtjks_file = Path(vtk_vs.to_vtkjs(folder=run_folder, name='vis_set'))
 
     return (leed_summary_folder, vtjks_file, summary, summary_grid,
             states_schedule, states_schedule_err)
@@ -373,23 +371,18 @@ def select_menu(api_client: ApiClient, user: dict):
                         st.session_state['run'] = None
 
 
-def load_sample():
-    sample_folder = Path(f'{st.session_state.target_folder}/sample')
-    leed_summary_folder = sample_folder.joinpath('leed-summary')
-
-    with open(leed_summary_folder.joinpath('summary.json')) as json_file:
+def load_from_folder(folder: Path):
+    leed_summary = folder.joinpath('leed-summary')
+    with open(leed_summary.joinpath('summary.json')) as json_file:
         summary = json.load(json_file)
-    with open(leed_summary_folder.joinpath('summary_grid.json')) as json_file:
+    with open(leed_summary.joinpath('summary_grid.json')) as json_file:
         summary_grid = json.load(json_file)
-    with open(leed_summary_folder.joinpath('states_schedule.json')) as json_file:
+    with open(leed_summary.joinpath('states_schedule.json')) as json_file:
         states_schedule = json.load(json_file)
-    if leed_summary_folder.joinpath('states_schedule_err.json').is_file():
-        with open(leed_summary_folder.joinpath('states_schedule_err.json')) as json_file:
-            states_schedule_err = json.load(json_file)
-    else:
-        states_schedule_err = {}
+    with open(leed_summary.joinpath('states_schedule_err.json')) as json_file:
+        states_schedule_err = json.load(json_file)
 
-    vtjks_file = Path(sample_folder, 'vis_set.vtkjs')
+    vtjks_file = Path(folder, 'vis_set.vtkjs')
 
-    return (leed_summary_folder, vtjks_file, summary, summary_grid,
-            states_schedule, states_schedule_err)
+    return (leed_summary, vtjks_file, summary, summary_grid, states_schedule,
+            states_schedule_err)

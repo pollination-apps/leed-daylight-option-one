@@ -1,6 +1,7 @@
 """Pollination LEED Daylight Option I App."""
 import streamlit as st
 from packaging import version
+from pathlib import Path
 
 from pollination_streamlit.selectors import get_api_client, run_selector
 from pollination_streamlit_io import auth_user
@@ -8,7 +9,7 @@ from pollination_streamlit_viewer import viewer
 
 from helper import (download_files, process_summary,
     show_warnings_and_errors, process_space, process_states_schedule,
-    process_ase, select_menu, load_sample)
+    process_ase, select_menu, load_from_folder)
 from inputs import initialize
 
 
@@ -51,11 +52,13 @@ def main():
                 st.session_state['run'] = run
         else:
             # get sample files
+            sample_folder = st.session_state.target_folder.joinpath('sample')
             folder, vtjks_file, summary, summary_grid, states_schedule, \
-                states_schedule_err = load_sample()
+                states_schedule_err = load_from_folder(sample_folder)
 
     if st.session_state['run'] is not None \
             or st.session_state['load_method'] == 'Try the sample run':
+        run = st.session_state['run']
         if st.session_state['load_method'] != 'Try the sample run':
             if run.status.status.value != 'Succeeded':
                 st.error(
@@ -70,17 +73,24 @@ def main():
                     f'recipe. The input run is using {run.recipe.owner}/{run.recipe.name}.'
                 )
                 st.stop()
-            if version.parse(run.recipe.tag) < version.parse('0.0.14'):
+            if version.parse(run.recipe.tag) < version.parse('0.0.19'):
                 with study_tab:
                     st.error(
-                        'Only versions pollination/leed-daylight-option-one:0.0.14 or higher '
+                        'Only versions pollination/leed-daylight-option-one:0.0.19 or higher '
                         f'are valid. Current version of the recipe: {run.recipe.tag}.'
                     )
                 st.stop()
 
-            with st.spinner('Downloading files...'):
+            if st.session_state.run_url:
+                run_id = st.session_state.run_url.split('/')[-1]
+                run_folder = Path(st.session_state['target_folder'].joinpath('data', run_id))
+            if run_folder.exists():
                 folder, vtjks_file, summary, summary_grid, states_schedule, \
-                    states_schedule_err = download_files(run)
+                    states_schedule_err = load_from_folder(run_folder)
+            else:
+                with st.spinner('Downloading files...'):
+                    folder, vtjks_file, summary, summary_grid, states_schedule, \
+                        states_schedule_err = download_files(run)
 
         with summary_tab:
             process_summary(summary)
@@ -97,6 +107,11 @@ def main():
 
         with visualization_tab:
             viewer(content=vtjks_file.read_bytes(), key='viz')
+    else:
+        for tab in (summary_tab, space_tab, states_schedule_tab, dir_ill_tab,
+                    visualization_tab):
+            with tab:
+                st.error('Select a study in the first tab!')
 
 if __name__ == '__main__':
     main()
