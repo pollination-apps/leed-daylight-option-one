@@ -26,9 +26,9 @@ def main():
     initialize()
 
     # set up tabs
-    study_tab, summary_tab, space_tab, states_schedule_tab, dir_ill_tab, visualization_tab = \
-        st.tabs(['Select a study', 'Summary report', 'Space by space breakdown',
-             'States schedule', 'Direct Illuminance', 'Visualization']
+    study_tab, summary_tab, states_schedule_tab, dir_ill_tab, visualization_tab = \
+        st.tabs(['Select a study', 'Summary report', 'States schedule',
+                 'Direct Illuminance', 'Visualization']
         )
 
     with study_tab:
@@ -95,8 +95,6 @@ def main():
         with summary_tab:
             process_summary(summary)
             show_warnings_and_errors(summary, summary_grid, states_schedule_err)
-
-        with space_tab:
             process_space(summary_grid)
 
         with states_schedule_tab:
@@ -108,7 +106,7 @@ def main():
         with visualization_tab:
             viewer(content=vtjks_file.read_bytes(), key='viz')
     else:
-        for tab in (summary_tab, space_tab, states_schedule_tab, dir_ill_tab,
+        for tab in (summary_tab, states_schedule_tab, dir_ill_tab,
                     visualization_tab):
             with tab:
                 st.error('Select a study in the first tab!')

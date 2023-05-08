@@ -88,6 +88,8 @@ def process_summary(summary: dict):
     ase_text = f'Annual Sunlight Exposure: {round(ase, 2)}%'
     st.markdown(ase_text)
 
+    df = pd.DataFrame.from_dict(summary, orient='index').transpose()
+    df.rename(columns={'sda': 'sDA [%]', 'ase': 'ASE [%]'}, inplace=True)
     # total floor area / total sensor count
     if 'total_floor_area' in summary:
         floor_area_passing_sda = summary['floor_area_passing_sda']
@@ -103,6 +105,14 @@ def process_summary(summary: dict):
         total_floor_area = summary['total_floor_area']
         total_floor_area_text = f'Total floor area: {round(total_floor_area, 2)}'
         st.markdown(total_floor_area_text)
+
+        df.rename(columns={
+            'floor_area_passing_sda': 'Floor area passing sDA',
+            'floor_area_passing_ase': 'Floor area passing ASE',
+            'total_floor_area': 'Total floor area',
+            'credits': 'LEED Credits'
+            }, inplace=True
+        )
     else:
         sensor_count_passing_sda = summary['sensor_count_passing_sda']
         sensor_count_passing_sda_text = \
@@ -118,6 +128,20 @@ def process_summary(summary: dict):
         total_sensor_count_text = \
             f'Total sensor count: {round(total_sensor_count, 2)}'
         st.markdown(total_sensor_count_text)
+
+        df.rename(columns={
+            'sensor_count_passing_sda': 'Sensor count passing sDA',
+            'sensor_count_passing_ase': 'Sensor count passing ASE',
+            'total_sensor_count': 'Total sensor count',
+            'credits': 'LEED Credits'
+            }, inplace=True
+        )
+
+    csv = df.to_csv(index=False, float_format='%.2f')
+    st.download_button(
+        'Download model breakdown', csv, 'summary.csv', 'text/csv',
+        key='download_model_breakdown'
+    )
 
 
 def show_warnings_and_errors(
@@ -179,7 +203,6 @@ def show_warnings_and_errors(
 def process_space(summary_grid: dict):
     st.header('Space by space breakdown')
     df = pd.DataFrame.from_dict(summary_grid).transpose()
-
     try:
         df = df[
             ['ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda',
@@ -209,8 +232,19 @@ def process_space(summary_grid: dict):
                 'total_sensor_count': 'Total sensor count'
             }
         )
-
-    st.dataframe(df)
+    df = df.rename_axis('Space Name').reset_index()
+    round_columns = [
+        'ASE [%]', 'sDA [%]', 'Floor area passing ASE', 'Floor area passing sDA',
+        'Total floor area', 'Sensor count passing ASE', 'Sensor count passing sDA',
+        'Total sensor count'
+    ]
+    style_round = {column: '{:.2f}' for column in round_columns}
+    st.table(df.style.format(style_round))
+    csv = df.to_csv(index=False, float_format='%.2f')
+    st.download_button(
+        'Download space by space breakdown', csv, 'summary_space.csv',
+        'text/csv', key='download_summary_space'
+    )
 
 
 def process_states_schedule(states_schedule: dict):
