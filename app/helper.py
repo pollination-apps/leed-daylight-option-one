@@ -144,15 +144,15 @@ def process_summary(summary: dict):
     )
 
 
-def show_warnings_and_errors(
-        summary: dict, summary_grid: dict, states_schedule_err: dict):
-    # display warnings and errors
+def show_errors(
+        summary: dict, states_schedule_err: dict):
+    # display errors
     if 'note' in summary:
         st.error(summary['note'])
     if bool(states_schedule_err):
         states_schedule_err_label = (
-            'Hours where 2% of the floor area receives direct illuminance of '
-            '1000 lux or more.'
+            'Hours where more than 2% of the floor area receives direct '
+            'illuminance of 1000 lux or more.'
         )
         with st.expander(states_schedule_err_label, expanded=True):
             st.write(
@@ -193,14 +193,8 @@ def show_warnings_and_errors(
             for grid_id in st.session_state['select_grids']:
                 figure_grids(grid_id, states_schedule_err)
 
-    for value in summary_grid.values():
-        if 'ase_note' in value:
-            st.warning(f'{value["ase_note"]}')
-        elif 'ase_warning' in value:
-            st.error(f'{value["ase_warning"]}')
 
-
-def process_space(summary_grid: dict):
+def process_space(summary_grid: dict, states_schedule_err: dict):
     st.header('Space by space breakdown')
     df = pd.DataFrame.from_dict(summary_grid).transpose()
     try:
@@ -239,7 +233,61 @@ def process_space(summary_grid: dict):
         'Total sensor count'
     ]
     style_round = {column: '{:.2f}' for column in round_columns}
-    st.table(df.style.format(style_round))
+
+    ase_notes = []
+    for room_id, data in summary_grid.items():
+        if 'ase_note' in data:
+            ase_notes.append(data['ase_note'])
+        else:
+            ase_notes.append('')
+    if not all(n=='' for n in ase_notes):
+        df['ASE Note'] = ase_notes
+
+    warning_rooms = []
+    for room_id in df['Space Name']:
+        if room_id in states_schedule_err.keys():
+            warning_rooms.append('There are hours where more than 2% of the '
+                                 'floor area receives direct illuminance of '
+                                 '1000 lux or more.')
+        else:
+            warning_rooms.append('')
+    if not all(w=='' for w in warning_rooms):
+        df['Warning'] = warning_rooms
+
+    def color_ase(val):
+        alpha = 0.3
+        color = f'rgba(255, 170, 0, {alpha})' if val > 10 else f'rgba(0, 255, 0, {alpha})'
+        return f'background-color: {color}'
+    def color_sda(val):
+        alpha = 0.3
+        if val >= 75:
+            color = f'rgba(0, 255, 0, {alpha})'
+        elif val >= 55:
+            color = f'rgba(85, 255, 0, {alpha})'
+        elif val >= 40:
+            color = f'rgba(170, 255, 0, {alpha})'
+        else:
+            color = f'rgba(255, 170, 0, {alpha})'
+        return f'background-color: {color}'
+    def color_fail(val, failed_rooms):
+        alpha = 0.3
+        if val['Space Name'] in failed_rooms:
+            color = [f'background-color: rgba(255, 0, 0, {alpha})']
+        else:
+            color = ['']
+        return color * len(val)
+
+    if states_schedule_err.keys():
+        failed_rooms = list(states_schedule_err.keys())
+        df_s = df.style.applymap(color_ase, subset=['ASE [%]']).applymap(
+            color_sda, subset=['sDA [%]']).apply(
+            color_fail, failed_rooms=failed_rooms, axis=1).format(style_round)
+    else:
+        df_s = df.style.applymap(color_ase, subset=['ASE [%]']).applymap(
+            color_sda, subset=['sDA [%]']).format(style_round)
+
+    st.table(df_s)
+
     csv = df.to_csv(index=False, float_format='%.2f')
     st.download_button(
         'Download space by space breakdown', csv, 'summary_space.csv',

@@ -8,7 +8,7 @@ from pollination_streamlit_io import auth_user
 from pollination_streamlit_viewer import viewer
 
 from helper import (download_files, process_summary,
-    show_warnings_and_errors, process_space, process_states_schedule,
+    show_errors, process_space, process_states_schedule,
     process_ase, select_menu, load_from_folder)
 from inputs import initialize
 
@@ -92,10 +92,13 @@ def main():
                     folder, vtjks_file, summary, summary_grid, states_schedule, \
                         states_schedule_err = download_files(run)
 
+        with study_tab:
+            st.info('Please go to the next tab to show the results!')
+
         with summary_tab:
             process_summary(summary)
-            show_warnings_and_errors(summary, summary_grid, states_schedule_err)
-            process_space(summary_grid)
+            show_errors(summary, states_schedule_err)
+            process_space(summary_grid, states_schedule_err)
 
         with states_schedule_tab:
             process_states_schedule(states_schedule)
