@@ -21,7 +21,7 @@ from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 from vis_metadata import _leed_daylight_option_one_vis_metadata
 
 
-@st.cache(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def download_files(run: Run) -> None:
     """Download files from a run on Pollination.
 
