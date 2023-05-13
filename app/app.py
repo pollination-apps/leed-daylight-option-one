@@ -52,7 +52,7 @@ def main():
                 st.session_state['run'] = run
         else:
             # get sample files
-            sample_folder = st.session_state.target_folder.joinpath('sample')
+            sample_folder = st.session_state.sample_folder
             folder, vtjks_file, summary, summary_grid, states_schedule, \
                 states_schedule_err = load_from_folder(sample_folder)
 
@@ -81,9 +81,7 @@ def main():
                     )
                 st.stop()
 
-            if st.session_state.run_url:
-                run_id = st.session_state.run_url.split('/')[-1]
-                run_folder = Path(st.session_state['target_folder'].joinpath('data', run_id))
+            run_folder = Path(st.session_state.target_folder.joinpath('data', run.id))
             if run_folder.exists():
                 folder, vtjks_file, summary, summary_grid, states_schedule, \
                     states_schedule_err = load_from_folder(run_folder)

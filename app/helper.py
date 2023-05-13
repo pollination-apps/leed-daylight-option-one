@@ -22,20 +22,20 @@ from vis_metadata import _leed_daylight_option_one_vis_metadata
 
 
 @st.cache_data(show_spinner=False)
-def download_files(run: Run) -> None:
+def download_files(_run: Run) -> None:
     """Download files from a run on Pollination.
 
     Args:
         run: Run.
     """
-    _, info = next(run.job.runs_dataframe.input_artifacts.iterrows())
-    model_dict = json.load(run.job.download_artifact(info.model))
+    _, info = next(_run.job.runs_dataframe.input_artifacts.iterrows())
+    model_dict = json.load(_run.job.download_artifact(info.model))
     hb_model = Model.from_dict(model_dict)
 
-    run_folder = st.session_state.data_folder.joinpath(run.id)
+    run_folder = st.session_state.data_folder.joinpath(_run.id)
     leed_summary_folder = run_folder.joinpath('leed-summary')
 
-    output = run.download_zipped_output('leed-summary')
+    output = _run.download_zipped_output('leed-summary')
     with zipfile.ZipFile(output) as zip_folder:
         zip_folder.extractall(leed_summary_folder)
 
@@ -453,6 +453,7 @@ def select_menu(api_client: ApiClient, user: dict):
                         st.session_state['run'] = None
 
 
+st.cache_data
 def load_from_folder(folder: Path):
     leed_summary = folder.joinpath('leed-summary')
     with open(leed_summary.joinpath('summary.json')) as json_file:

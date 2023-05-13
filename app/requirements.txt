@@ -1,4 +1,4 @@
-pollination-streamlit==0.5.4
+pollination-streamlit==0.5.5
 honeybee-display[full]==0.2.17
 ladybug-charts==1.18.8
 pollination_streamlit_io>=0.51.3

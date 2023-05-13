@@ -9,10 +9,12 @@ def initialize():
         st.session_state.target_folder = Path(__file__).parent
     if 'data_folder' not in st.session_state:
         st.session_state.data_folder = st.session_state.target_folder.joinpath('data')
-    if not 'select_aperture_groups' in st.session_state:
-        st.session_state['select_aperture_groups'] = []
-    if not 'select_grids' in st.session_state:
-        st.session_state['select_grids'] = []
+    if 'sample_folder' not in st.session_state:
+        st.session_state.sample_folder = st.session_state.target_folder.joinpath('sample')
+    if 'select_aperture_groups' not in st.session_state:
+        st.session_state.select_aperture_groups = []
+    if 'select_grids' not in st.session_state:
+        st.session_state.select_grids = []
 
     if 'active_option' not in st.session_state:
         st.session_state.active_option = 'Load from a project'
