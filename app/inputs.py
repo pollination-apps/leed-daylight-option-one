@@ -11,6 +11,7 @@ def initialize():
         st.session_state.data_folder = st.session_state.target_folder.joinpath('data')
     if 'sample_folder' not in st.session_state:
         st.session_state.sample_folder = st.session_state.target_folder.joinpath('sample')
+
     if 'select_aperture_groups' not in st.session_state:
         st.session_state.select_aperture_groups = []
     if 'select_grids' not in st.session_state:
