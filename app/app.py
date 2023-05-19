@@ -81,14 +81,9 @@ def main():
                     )
                 st.stop()
 
-            run_folder = Path(st.session_state.target_folder.joinpath('data', run.id))
-            if run_folder.exists():
+            with st.spinner('Downloading files...'):
                 folder, vtjks_file, summary, summary_grid, states_schedule, \
-                    states_schedule_err = load_from_folder(run_folder)
-            else:
-                with st.spinner('Downloading files...'):
-                    folder, vtjks_file, summary, summary_grid, states_schedule, \
-                        states_schedule_err = download_files(run)
+                    states_schedule_err = download_files(run)
 
         with study_tab:
             st.info('Please go to the next tab to show the results!')
