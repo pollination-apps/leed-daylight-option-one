@@ -42,24 +42,18 @@ def main():
         if st.session_state['load_method'] != 'Try the sample run':
             api_client = get_api_client()
             user = auth_user('auth-user', api_client)
-            if st.session_state['load_method'] == 'Load from a project':
-                select_menu(api_client, user)
-            elif st.session_state['load_method'] == 'Load from a URL':
-                run = run_selector(
-                    api_client, default=st.session_state['run_url'],
-                    help='Paste run URL.'
-                )
-                st.session_state['run'] = run
-        else:
-            # get sample files
+            select_menu(api_client, user)
+
+
+    if st.session_state['run'] is not None \
+        or st.session_state['load_method'] == 'Try the sample run':
+        if st.session_state['load_method'] == 'Try the sample run':
             sample_folder = st.session_state.sample_folder
             folder, vtjks_file, summary, summary_grid, states_schedule, \
                 states_schedule_err = load_from_folder(sample_folder)
-
-    if st.session_state['run'] is not None \
-            or st.session_state['load_method'] == 'Try the sample run':
-        run = st.session_state['run']
-        if st.session_state['load_method'] != 'Try the sample run':
+        else:
+            run = st.session_state['run']
+            run_folder = Path(st.session_state.data_folder.joinpath(run.id))
             if run.status.status.value != 'Succeeded':
                 st.error(
                     'The run status must be \'Succeeded\'. '
@@ -81,9 +75,12 @@ def main():
                     )
                 st.stop()
 
-            with st.spinner('Downloading files...'):
-                folder, vtjks_file, summary, summary_grid, states_schedule, \
-                    states_schedule_err = download_files(run)
+            if not run_folder.exists():
+                with st.spinner('Downloading files...'):
+                    run_folder = download_files(run)
+
+            folder, vtjks_file, summary, summary_grid, states_schedule, \
+                states_schedule_err = load_from_folder(run_folder)
 
         with study_tab:
             st.info('Please go to the next tab to show the results!')

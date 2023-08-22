@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 from honeybee.model import Model
-from pollination_streamlit.selectors import Run
+from pollination_streamlit.interactors import Run
 from pollination_streamlit.api.client import ApiClient
 from pollination_streamlit_io import (select_account, select_project,
     select_study, select_run)
@@ -21,35 +21,25 @@ from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 from vis_metadata import _leed_daylight_option_one_vis_metadata
 
 
-@st.cache_data(show_spinner=False)
-def download_files(_run: Run) -> None:
+def download_files(run: Run) -> None:
     """Download files from a run on Pollination.
 
     Args:
         run: Run.
     """
-    _, info = next(_run.job.runs_dataframe.input_artifacts.iterrows())
-    model_dict = json.load(_run.job.download_artifact(info.model))
+    _, info = next(run.job.runs_dataframe.input_artifacts.iterrows())
+    model_dict = json.load(run.job.download_artifact(info.model))
     hb_model = Model.from_dict(model_dict)
 
-    run_folder = st.session_state.data_folder.joinpath(_run.id)
+    run_folder = st.session_state.data_folder.joinpath(run.id)
     leed_summary_folder = run_folder.joinpath('leed-summary')
 
-    output = _run.download_zipped_output('leed-summary')
+    output = run.download_zipped_output('leed-summary')
     with zipfile.ZipFile(output) as zip_folder:
         zip_folder.extractall(leed_summary_folder)
 
-    with open(leed_summary_folder.joinpath('summary.json')) as json_file:
-        summary = json.load(json_file)
-    with open(leed_summary_folder.joinpath('summary_grid.json')) as json_file:
-        summary_grid = json.load(json_file)
-    with open(leed_summary_folder.joinpath('states_schedule.json')) as json_file:
-        states_schedule = json.load(json_file)
-    if leed_summary_folder.joinpath('states_schedule_err.json').is_file():
-        with open(leed_summary_folder.joinpath('states_schedule_err.json')) as json_file:
-            states_schedule_err = json.load(json_file)
-    else:
-        states_schedule_err = {}
+    if not leed_summary_folder.joinpath('states_schedule_err.json').is_file():
+        json.dump({}, leed_summary_folder.joinpath('states_schedule_err.json'))
 
     results_folder = leed_summary_folder.joinpath('results')
     metric_info_dict = _leed_daylight_option_one_vis_metadata()
@@ -63,10 +53,9 @@ def download_files(_run: Run) -> None:
         grid_data_path=str(results_folder), active_grid_data='da'
     )
     vtk_vs = VTKVisualizationSet.from_visualization_set(vs)
-    vtjks_file = Path(vtk_vs.to_vtkjs(folder=run_folder, name='vis_set'))
+    vtk_vs.to_vtkjs(folder=run_folder, name='vis_set')
 
-    return (leed_summary_folder, vtjks_file, summary, summary_grid,
-            states_schedule, states_schedule_err)
+    return leed_summary_folder.parent
 
 
 def process_summary(summary: dict):
@@ -372,18 +361,16 @@ def process_ase(folder: Path):
     )
 
     legend_min, legend_max = st.columns(2)
-    if not 'legend_min' in st.session_state:
-        st.session_state['legend_min'] = float(0)
-    if not 'legend_max' in st.session_state:
-        st.session_state['legend_max'] = float(100)
     with legend_min:
         st.number_input(
             'Legend minimum', min_value=float(0), max_value=float(100),
-            format='%.2f', key='legend_min', on_change=legend_min_on_change)
+            value=float(0), format='%.2f',
+            key='legend_min', on_change=legend_min_on_change)
     with legend_max:
         st.number_input(
             'Legend maximum', min_value=float(0), max_value=float(100),
-            format='%.2f', key='legend_max', on_change=legend_max_on_change)
+            value=float(10), format='%.2f',
+            key='legend_max', on_change=legend_max_on_change)
 
     for grid_id in st.session_state['select_ase']:
         figure_ase(grid_id, results_folder)
@@ -442,12 +429,6 @@ def select_menu(api_client: ApiClient, user: dict):
                         run_id = run['id']
                         run = Run(project_owner, project_name,
                                   job_id, run_id, api_client)
-                        run_url = (f'{run._client.host}/{run.owner}/projects/'
-                                   f'{run.project}/studies/{run.job_id}/runs/'
-                                   f'{run.id}')
-                        st.experimental_set_query_params(url=run_url)
-                        st.session_state.run_url = run_url
-                        st.session_state.active_option = 'Load from a URL'
                         st.session_state['run'] = run
                     else:
                         st.session_state['run'] = None
