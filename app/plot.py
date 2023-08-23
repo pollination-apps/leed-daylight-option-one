@@ -1,9 +1,9 @@
 """Functions to support plots."""
+import json
+from pathlib import Path
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-import json
-from pathlib import Path
 
 from ladybug.datacollection import HourlyContinuousCollection
 from ladybug.datatype.base import DataTypeBase
@@ -17,7 +17,6 @@ from ladybug_pandas.series import Series
 
 def get_figure_config(title: str) -> dict:
     """Set figure config so that a figure can be downloaded as SVG."""
-
     return {
         'toImageButtonOptions': {
             'format': 'svg',  # one of png, svg, jpeg, webp
