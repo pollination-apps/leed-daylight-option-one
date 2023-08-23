@@ -1,64 +1,19 @@
 """Functions to support the leed-daylight-option-one app."""
-import zipfile
 import json
-import pandas as pd
 from pathlib import Path
+import pandas as pd
 
 import streamlit as st
-from honeybee.model import Model
-from pollination_streamlit.interactors import Run
-from pollination_streamlit.api.client import ApiClient
-from pollination_streamlit_io import (select_account, select_project,
-    select_study, select_run)
-from honeybee_display.model import model_to_vis_set
 from ladybug.datacollection import HourlyContinuousCollection
-from ladybug_vtk.visualization_set import VisualizationSet as VTKVisualizationSet
 
 from on_change import (radio_show_all_grids, radio_show_all,
     multiselect_grids, multiselect_aperture_groups, radio_show_all_ase,
     multiselect_ase, legend_min_on_change, legend_max_on_change)
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
-from vis_metadata import _leed_daylight_option_one_vis_metadata
-
-
-def download_files(run: Run) -> None:
-    """Download files from a run on Pollination.
-
-    Args:
-        run: Run.
-    """
-    _, info = next(run.job.runs_dataframe.input_artifacts.iterrows())
-    model_dict = json.load(run.job.download_artifact(info.model))
-    hb_model = Model.from_dict(model_dict)
-
-    run_folder = st.session_state.data_folder.joinpath(run.id)
-    leed_summary_folder = run_folder.joinpath('leed-summary')
-
-    output = run.download_zipped_output('leed-summary')
-    with zipfile.ZipFile(output) as zip_folder:
-        zip_folder.extractall(leed_summary_folder)
-
-    if not leed_summary_folder.joinpath('states_schedule_err.json').is_file():
-        json.dump({}, leed_summary_folder.joinpath('states_schedule_err.json'))
-
-    results_folder = leed_summary_folder.joinpath('results')
-    metric_info_dict = _leed_daylight_option_one_vis_metadata()
-    for metric, data in metric_info_dict.items():
-        file_path = results_folder.joinpath(metric, 'vis_metadata.json')
-        with open(file_path, 'w') as fp:
-            json.dump(data, fp, indent=4)
-
-    vs = model_to_vis_set(
-        hb_model, color_by=None, include_wireframe=True,
-        grid_data_path=str(results_folder), active_grid_data='da'
-    )
-    vtk_vs = VTKVisualizationSet.from_visualization_set(vs)
-    vtk_vs.to_vtkjs(folder=run_folder, name='vis_set')
-
-    return leed_summary_folder.parent
 
 
 def process_summary(summary: dict):
+    """Process summary."""
     points = summary['credits']
     if points > 1:
         color = 'Green'
@@ -133,9 +88,8 @@ def process_summary(summary: dict):
     )
 
 
-def show_errors(
-        summary: dict, states_schedule_err: dict):
-    # display errors
+def show_errors(summary: dict, states_schedule_err: dict):
+    """Show errors from simulation."""
     if 'note' in summary:
         st.error(summary['note'])
     if bool(states_schedule_err):
@@ -184,6 +138,7 @@ def show_errors(
 
 
 def process_space(summary_grid: dict, states_schedule_err: dict):
+    """Process space."""
     st.header('Space by space breakdown')
     df = pd.DataFrame.from_dict(summary_grid).transpose()
     try:
@@ -285,6 +240,7 @@ def process_space(summary_grid: dict, states_schedule_err: dict):
 
 
 def process_states_schedule(states_schedule: dict):
+    """Process states schedule."""
     st.info(
         'Visualize shading schedules of each aperture group.'
     )
@@ -324,6 +280,7 @@ def process_states_schedule(states_schedule: dict):
 
 
 def process_ase(folder: Path):
+    """Process ASE."""
     st.info(
         'Visualize the percentage of floor area where the direct illuminance '
         'is larger than 1000.'
@@ -374,79 +331,3 @@ def process_ase(folder: Path):
 
     for grid_id in st.session_state['select_ase']:
         figure_ase(grid_id, results_folder)
-
-
-def select_menu(api_client: ApiClient, user: dict):
-    if user and 'username' in user:
-        username = user['username']
-        account = select_account(
-            'select-account',
-            api_client,
-            default_account_username=username
-        )
-
-        if account:
-            st.subheader('Hi ' + username + ', select a project:')
-            if 'owner' in account:
-                username = account['account_name']
-
-            project = select_project(
-                'select-project',
-                api_client,
-                project_owner=username,
-                default_project_id=st.session_state['project_id']
-            )
-
-            if project and 'name' in project:
-                st.session_state['project_id'] = project['id']
-
-                st.subheader('Select a study:')
-                study = select_study(
-                    'select-study',
-                    api_client,
-                    project_name=project['name'],
-                    project_owner=username
-                )
-
-                if study and 'id' in study:
-                    st.session_state['study_id'] = study['id']
-
-                    st.subheader('Select a run:')
-                    run = select_run(
-                        'select-run',
-                        api_client,
-                        project_name=project['name'],
-                        project_owner=username,
-                        job_id=study['id']
-                    )
-
-                    if run is not None:
-                        st.session_state['run_id'] = run['id']
-
-                        project_owner = username
-                        project_name = project['name']
-                        job_id = study['id']
-                        run_id = run['id']
-                        run = Run(project_owner, project_name,
-                                  job_id, run_id, api_client)
-                        st.session_state['run'] = run
-                    else:
-                        st.session_state['run'] = None
-
-
-st.cache_data
-def load_from_folder(folder: Path):
-    leed_summary = folder.joinpath('leed-summary')
-    with open(leed_summary.joinpath('summary.json')) as json_file:
-        summary = json.load(json_file)
-    with open(leed_summary.joinpath('summary_grid.json')) as json_file:
-        summary_grid = json.load(json_file)
-    with open(leed_summary.joinpath('states_schedule.json')) as json_file:
-        states_schedule = json.load(json_file)
-    with open(leed_summary.joinpath('states_schedule_err.json')) as json_file:
-        states_schedule_err = json.load(json_file)
-
-    vtjks_file = Path(folder, 'vis_set.vtkjs')
-
-    return (leed_summary, vtjks_file, summary, summary_grid, states_schedule,
-            states_schedule_err)

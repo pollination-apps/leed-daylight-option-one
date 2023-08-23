@@ -1,16 +1,14 @@
 """Pollination LEED Daylight Option I App."""
 import streamlit as st
-from packaging import version
-from pathlib import Path
 
-from pollination_streamlit.selectors import get_api_client, run_selector
-from pollination_streamlit_io import auth_user
 from pollination_streamlit_viewer import viewer
 
-from helper import (download_files, process_summary,
-    show_errors, process_space, process_states_schedule,
-    process_ase, select_menu, load_from_folder)
 from inputs import initialize
+from menu import study_menu
+from run import check_run_recipe
+from results import load_results, load_from_folder
+from process_results import (process_summary, show_errors, process_space,
+    process_states_schedule, process_ase)
 
 
 st.set_page_config(
@@ -19,68 +17,27 @@ st.set_page_config(
 )
 
 def main():
-    # title
+    """Main."""
     st.header('LEED Daylight Option I')
-
-    # initialize session state variables
     initialize()
 
-    # set up tabs
     study_tab, summary_tab, states_schedule_tab, dir_ill_tab, visualization_tab = \
         st.tabs(['Select a study', 'Summary report', 'States schedule',
                  'Direct Illuminance', 'Visualization']
         )
 
     with study_tab:
-        st.radio(
-            'Load method', options=st.session_state.options,
-            horizontal=True, label_visibility='collapsed', key='load_method',
-            index=st.session_state.options.index(
-                st.session_state.active_option)
-        )
-
-        if st.session_state['load_method'] != 'Try the sample run':
-            api_client = get_api_client()
-            user = auth_user('auth-user', api_client)
-            select_menu(api_client, user)
-
+        study_menu()
 
     if st.session_state['run'] is not None \
         or st.session_state['load_method'] == 'Try the sample run':
         if st.session_state['load_method'] == 'Try the sample run':
-            sample_folder = st.session_state.sample_folder
             folder, vtjks_file, summary, summary_grid, states_schedule, \
-                states_schedule_err = load_from_folder(sample_folder)
+                states_schedule_err = load_from_folder(st.session_state.sample_folder)
         else:
-            run = st.session_state['run']
-            run_folder = Path(st.session_state.data_folder.joinpath(run.id))
-            if run.status.status.value != 'Succeeded':
-                st.error(
-                    'The run status must be \'Succeeded\'. '
-                    f'The input run has status \'{run.status.status.value}\'.'
-                )
-                st.stop()
-            if f'{run.recipe.owner}/{run.recipe.name}' != \
-                'pollination/leed-daylight-option-one':
-                st.error(
-                    'This app is designed to work with pollination/leed-daylight-option-one '
-                    f'recipe. The input run is using {run.recipe.owner}/{run.recipe.name}.'
-                )
-                st.stop()
-            if version.parse(run.recipe.tag) < version.parse('0.0.19'):
-                with study_tab:
-                    st.error(
-                        'Only versions pollination/leed-daylight-option-one:0.0.19 or higher '
-                        f'are valid. Current version of the recipe: {run.recipe.tag}.'
-                    )
-                st.stop()
-
-            if not run_folder.exists():
-                with st.spinner('Downloading files...'):
-                    run_folder = download_files(run)
-
+            check_run_recipe(study_tab)
             folder, vtjks_file, summary, summary_grid, states_schedule, \
-                states_schedule_err = load_from_folder(run_folder)
+                states_schedule_err = load_results()
 
         with study_tab:
             st.info('Please go to the next tab to show the results!')
