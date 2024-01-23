@@ -223,11 +223,11 @@ def process_space(summary_grid: dict, states_schedule_err: dict):
 
     if states_schedule_err.keys():
         failed_rooms = list(states_schedule_err.keys())
-        df_s = df.style.applymap(color_ase, subset=['ASE [%]']).applymap(
+        df_s = df.style.map(color_ase, subset=['ASE [%]']).map(
             color_sda, subset=['sDA [%]']).apply(
             color_fail, failed_rooms=failed_rooms, axis=1).format(style_round)
     else:
-        df_s = df.style.applymap(color_ase, subset=['ASE [%]']).applymap(
+        df_s = df.style.map(color_ase, subset=['ASE [%]']).map(
             color_sda, subset=['sDA [%]']).format(style_round)
 
     st.table(df_s)
