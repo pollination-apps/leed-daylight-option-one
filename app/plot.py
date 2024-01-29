@@ -160,6 +160,8 @@ def figure_aperture_group_schedule(aperture_group: str,
 
     st.plotly_chart(fig, use_container_width=True, config=get_figure_config(aperture_group))
 
+    return fig
+
 
 def figure_ase(grid_id: str, results_folder: Path):
     with open (results_folder.joinpath(f'{grid_id}.json')) as file:
