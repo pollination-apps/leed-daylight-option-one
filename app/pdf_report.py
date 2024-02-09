@@ -18,7 +18,7 @@ from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Paragraph, \
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
-    Image, FrameBreak, Spacer, HRFlowable
+    Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether
 from svglib.svglib import svg2rlg
 
 from ladybug.analysisperiod import AnalysisPeriod
@@ -244,6 +244,9 @@ def create_pdf(
                               fontSize=10,
                               leading=12)
     )
+    new_style = styles['h2'].clone('h2_CENTER')
+    new_style.alignment = TA_CENTER
+    styles.add(new_style)
 
     title_frame = Frame(doc.leftMargin, doc.bottomMargin + doc.height - 4 * cm, doc.width, 4 * cm, showBoundary=1, id='title-frame')
     extra_frame = Frame(doc.leftMargin, doc.bottomMargin + doc.height - 9 * cm, doc.width, 4 * cm, showBoundary=1, id='extra-frame')
@@ -289,6 +292,24 @@ def create_pdf(
         Paragraph("Space Overview", style=styles['h2'])
         ]
     )
+
+    def get_sda_cell_color(val: float):
+        val = float(val)
+        if val >= 75:
+            return colors.Color(0, 255 / 255, 0, 0.3)
+        elif val >= 55:
+            return colors.Color(85 / 255, 255 / 255, 0, 0.3)
+        elif val >= 40:
+            return colors.Color(170 / 255, 255 / 255, 0, 0.3)
+        else:
+            return colors.Color(255 / 255, 170 / 255, 0, 0.3)
+
+    def get_ase_cell_color(val: float):
+        val = float(val)
+        if val > 10:
+            return colors.Color(255 / 255, 170 / 255, 0, 0.3)
+        else:
+            return colors.Color(0, 255 / 255, 0, 0.3)
 
     def table_from_summary_grid(summary_grid, grid_filter: list = None):
         if grid_filter:
@@ -336,24 +357,6 @@ def create_pdf(
 
         data = df.values.tolist()
 
-        def get_sda_cell_color(val: float):
-            val = float(val)
-            if val >= 75:
-                return colors.Color(0, 255 / 255, 0, 0.3)
-            elif val >= 55:
-                return colors.Color(85 / 255, 255 / 255, 0, 0.3)
-            elif val >= 40:
-                return colors.Color(170 / 255, 255 / 255, 0, 0.3)
-            else:
-                return colors.Color(255 / 255, 170 / 255, 0, 0.3)
-
-        def get_ase_cell_color(val: float):
-            val = float(val)
-            if val > 10:
-                return colors.Color(255 / 255, 170 / 255, 0, 0.3)
-            else:
-                return colors.Color(0, 255 / 255, 0, 0.3)
-
         df = df.astype(str)
         table_data =  [tuple(df)] + list(df.itertuples(index=False, name=None))
 
@@ -396,15 +399,7 @@ def create_pdf(
         story.append(Spacer(width=0*cm, height=0.5*cm))
         story.append(ase_note)
 
-    #story.append(NextPageTemplate('grid-page'))
-
     story.append(PageBreak())
-    # frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='normal')
-    # template = PageTemplate(id='test', frames=frame, onPage=partial(header_and_footer, header_content=header_content, footer_content=footer_content))
-    # doc.addPageTemplates([
-    #     PageTemplate(id='no_border', onPage=partial(header_and_footer, header_content=header_content, footer_content=footer_content), frames=[summary_frame, summary_frame_2])
-    #     ]
-    # )
 
     with open(folder.joinpath('grids_info.json')) as json_file:
         grids_info = json.load(json_file)
@@ -443,6 +438,46 @@ def create_pdf(
         # add ASE
         story.append(Paragraph(f'Annual Sunlight Exposure: {values["ase"]}%', style=styles['Normal']))
 
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        _sda_table = Table(data=[['Spatial Daylight Autonomy'], [Paragraph(f'{values["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ])
+        table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
+        table_style.add('BACKGROUND', (0, 1), (0, 1), get_sda_cell_color(values["sda"]))
+        _sda_table.setStyle(table_style)
+        # _ase_table = Table(data=[['Annual Sunlight Exposure'], [Paragraph(f'{values["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
+        # table_style = TableStyle([
+        #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        #     ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        #     ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+        #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        # ])
+        # table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
+        # table_style.add('BACKGROUND', (0, 1), (0, 1), get_ase_cell_color(values["ase"]))
+        _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ])
+        table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(values["ase"]))
+        _ase_table.setStyle(table_style)
+        table_style = TableStyle([
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        _metric_table.setStyle(table_style)
+        story.append(_metric_table)
+
         table, ase_notes = table_from_summary_grid(summary_grid, [grid_id])
         
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -471,7 +506,7 @@ def create_pdf(
         )
         story.append(Paragraph(body_text, style=styles['BodyText']))
         for aperture_group in light_paths:
-            story.append(Paragraph(aperture_group, style=styles['h3']))
+            aperture_group_header = Paragraph(aperture_group, style=styles['h3'])
             datacollection = \
                 HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
             
@@ -495,22 +530,20 @@ def create_pdf(
 
             # get figure
             figure = figure_aperture_group_schedule(aperture_group, datacollection)
-            #svg_path = figure.write_image(f'assets/images/figures/{aperture_group}.pdf', width=700, height=350)
-            img = BytesIO()
-            fig_svg = figure.to_image(format='pdf', width=700, height=350, scale=3)
-            img.write(fig_svg)
-            img.seek(0)
-            pdf_image =  PdfImage(img, width=doc.width*(2/3), height=None, keep_ratio=True)
+            fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
+            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*(2/3), height=None, keep_ratio=True)
             pdf_table = Table([[pdf_image]])
-            ggg = Table([[shading_table, pdf_table]], colWidths=[doc.width*(1/3), doc.width*(2/3)])
-            ggg.setStyle(
+            table = Table([[shading_table, pdf_table]], colWidths=[doc.width*(1/3), doc.width*(2/3)])
+            table.setStyle(
                 TableStyle([
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('VALIGN', (0, 0), (-1, -1), 'TOP')
                 ])
             )
-            story.append(ggg)
             story.append(Spacer(width=0*cm, height=0.5*cm))
+            story.append(KeepTogether(flowables=[aperture_group_header, table]))
+            #story.append(ggg)
+            #story.append(Spacer(width=0*cm, height=0.5*cm))
             #drawing = svg2rlg(img)
             #drawing = svg2rlg(svg_path)
             #assert False, drawing
@@ -519,6 +552,7 @@ def create_pdf(
 
         #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
+        # story.append(CondPageBreak())
 
     pollination_image = 'assets/images/pollination.png'
     # Build and save the PDF
