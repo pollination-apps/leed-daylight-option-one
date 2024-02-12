@@ -2,6 +2,7 @@ from pathlib import Path
 from functools import partial
 import pandas as pd
 import json
+import numpy as np
 from io import BytesIO
 from pdfrw import PdfReader, PdfDict
 from pdfrw.buildxobj import pagexobj
@@ -15,7 +16,7 @@ from reportlab.lib.units import mm, cm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, _baseFontNameB
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
-from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.shapes import Drawing, Circle, Rect, Polygon
 from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Paragraph, \
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
     Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether
@@ -23,6 +24,8 @@ from svglib.svglib import svg2rlg
 
 from ladybug.analysisperiod import AnalysisPeriod
 from ladybug.datacollection import HourlyContinuousCollection
+from ladybug.color import Colorset, ColorRange
+from honeybee.model import Model
 
 from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
@@ -266,32 +269,15 @@ def create_pdf(
     document_title = Paragraph("LEED Daylight Option I", title_style)
     story.append(document_title)
 
-    summary_story = []
     if summary['credits'] > 0:
-        summary_story.append(
+        story.append(
             Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h1'].clone(name='h1_GREEN', textColor='green'))
         )
     else:
-        summary_story.append(
+        story.append(
             Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h1'])
         )
-    
-    summary_story.append(
-        Paragraph(f'Spatial Daylight Autonomy: {summary["sda"]}%', style=styles['Normal'])
-    )
-
-    summary_story.append(
-        Paragraph(f'Annual Sunlight Exposure: {summary["ase"]}%', style=styles['Normal'])
-    )
-    story.extend(summary_story)
-
     story.append(Spacer(width=0*cm, height=0.5*cm))
-
-    # Create content
-    story.extend([
-        Paragraph("Space Overview", style=styles['h2'])
-        ]
-    )
 
     def get_sda_cell_color(val: float):
         val = float(val)
@@ -310,6 +296,61 @@ def create_pdf(
             return colors.Color(255 / 255, 170 / 255, 0, 0.3)
         else:
             return colors.Color(0, 255 / 255, 0, 0.3)
+
+    _sda_table = Table(data=[['Spatial Daylight Autonomy'], [Paragraph(f'{summary["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
+    table_style = TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+    ])
+    table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
+    table_style.add('BACKGROUND', (0, 1), (0, 1), get_sda_cell_color(summary["sda"]))
+    _sda_table.setStyle(table_style)
+    # _ase_table = Table(data=[['Annual Sunlight Exposure'], [Paragraph(f'{values["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
+    # table_style = TableStyle([
+    #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    #     ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    #     ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+    #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+    # ])
+    # table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
+    # table_style.add('BACKGROUND', (0, 1), (0, 1), get_ase_cell_color(values["ase"]))
+    _ase_table = Table(data=[[Paragraph(f'ASE: {summary["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+    table_style = TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+    ])
+    table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(summary["ase"]))
+    _ase_table.setStyle(table_style)
+    table_style = TableStyle([
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+    ])
+    _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+    _metric_table.setStyle(table_style)
+    story.append(_metric_table)
+
+    # summary_story.append(
+    #     Paragraph(f'Spatial Daylight Autonomy: {summary["sda"]}%', style=styles['Normal'])
+    # )
+
+    # summary_story.append(
+    #     Paragraph(f'Annual Sunlight Exposure: {summary["ase"]}%', style=styles['Normal'])
+    # )
+    # story.extend(summary_story)
+
+    story.append(Spacer(width=0*cm, height=0.5*cm))
+
+    # Create content
+    story.extend([
+        Paragraph("Space Overview", style=styles['h2'])
+        ]
+    )
 
     def table_from_summary_grid(summary_grid, grid_filter: list = None):
         if grid_filter:
@@ -429,8 +470,43 @@ def create_pdf(
             drawing.scale(scaling_factor, scaling_factor)
             return drawing
 
+    hb_model = Model.from_hbjson(Path('app/sample/leed_model.hbjson'))
+    sensor_grids = hb_model.properties.radiance.sensor_grids
+    sensor_grids = {sg.full_identifier: sg for sg in sensor_grids}
+
     for grid_id, values in summary_grid.items():
         story.append(Paragraph(grid_id, style=styles['h1']))
+
+        # heat map
+        sensor_grid = sensor_grids[grid_id]
+        mesh = sensor_grid.mesh
+        mesh_min = mesh.min
+        mesh_max = mesh.max
+        faces = mesh.faces
+        _width = mesh_max.x - mesh_min.x
+        _height = mesh_max.y - mesh_min.y
+        _ratio = _width / _height
+        drawing_width = (_width / 200) * 1000 * mm
+        drawing_height = drawing_width / _ratio
+        drawing = Drawing(drawing_width, drawing_height)
+        da = np.loadtxt(Path(f'app/sample/leed-summary/results/da/{grid_id}.da'))
+        color_range = ColorRange(domain=[0, 100])
+        for face, _da in zip(faces, da):
+            vertices = [mesh.vertices[i] for i in face]
+            points = []
+            for vertex in vertices:
+                points.extend(
+                    [
+                        np.interp(vertex.x, [mesh_min.x, mesh_max.x], [0, drawing_width]),
+                        np.interp(vertex.y, [mesh_min.y, mesh_max.y], [0, drawing_height])
+                    ]
+                )
+            lb_color =  color_range.color(_da)
+            fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
+            polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeOpacity=0)
+            drawing.add(polygon)
+
+        story.append(drawing)
 
         # add sDA
         story.append(Paragraph(f'Spatial Daylight Autonomy: {values["sda"]}%', style=styles['Normal']))
