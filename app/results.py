@@ -11,7 +11,7 @@ from download import download_files
 
 st.cache_data
 def load_from_folder(folder: Path) \
-    -> Tuple[Path, Path, dict, dict, dict, dict]:
+    -> Tuple[Path, Path, dict, dict, dict, dict, Model]:
     """Load results from folder."""
     leed_summary = folder.joinpath('leed-summary')
     with open(leed_summary.joinpath('summary.json')) as json_file:
