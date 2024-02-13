@@ -1,125 +1,126 @@
 {
   "Room_1": {
-    "ase": 7.73,
+    "ase": 6.32,
     "sda": 100.0,
-    "floor_area_passing_ase": 50.75,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 67.45,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_2": {
     "ase_note": "The Annual Sunlight Exposure is greater than 10% for space: Room_2. Identify in writing how the space is designed to address glare.",
-    "ase": 10.62,
-    "sda": 63.12,
-    "floor_area_passing_ase": 35.75,
-    "floor_area_passing_sda": 25.25,
-    "total_floor_area": 40.0
+    "ase": 14.97,
+    "sda": 40.11,
+    "floor_area_passing_ase": 45.91,
+    "floor_area_passing_sda": 21.66,
+    "total_floor_area": 54.0
   },
   "Room_3": {
     "ase_note": "The Annual Sunlight Exposure is greater than 10% for space: Room_3. Identify in writing how the space is designed to address glare.",
-    "ase": 25.85,
-    "sda": 42.9,
-    "floor_area_passing_ase": 65.25,
-    "floor_area_passing_sda": 37.75,
-    "total_floor_area": 88.0
+    "ase": 25.49,
+    "sda": 31.86,
+    "floor_area_passing_ase": 80.47,
+    "floor_area_passing_sda": 34.41,
+    "total_floor_area": 108.0
   },
   "Room_4": {
     "ase": 0.0,
-    "sda": 52.73,
-    "floor_area_passing_ase": 55.0,
-    "floor_area_passing_sda": 29.0,
-    "total_floor_area": 55.0
+    "sda": 44.57,
+    "floor_area_passing_ase": 72.0,
+    "floor_area_passing_sda": 32.09,
+    "total_floor_area": 72.0
   },
   "Room_5": {
-    "ase": 4.55,
+    "ase": 3.26,
     "sda": 100.0,
-    "floor_area_passing_ase": 52.5,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 69.65,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_6": {
     "ase_note": "The Annual Sunlight Exposure is greater than 10% for space: Room_6. Identify in writing how the space is designed to address glare.",
-    "ase": 23.58,
-    "sda": 47.44,
-    "floor_area_passing_ase": 67.25,
-    "floor_area_passing_sda": 41.75,
-    "total_floor_area": 88.0
+    "ase": 23.53,
+    "sda": 34.31,
+    "floor_area_passing_ase": 82.59,
+    "floor_area_passing_sda": 37.06,
+    "total_floor_area": 108.0
   },
   "Room_7": {
-    "ase": 0.45,
+    "ase": 0.0,
     "sda": 100.0,
-    "floor_area_passing_ase": 54.75,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 72.0,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_8": {
     "ase": 0.0,
-    "sda": 66.36,
-    "floor_area_passing_ase": 55.0,
-    "floor_area_passing_sda": 36.5,
-    "total_floor_area": 55.0
+    "sda": 52.17,
+    "floor_area_passing_ase": 72.0,
+    "floor_area_passing_sda": 37.57,
+    "total_floor_area": 72.0
   },
   "Room_9": {
-    "ase": 10.0,
+    "ase": 8.7,
     "sda": 100.0,
-    "floor_area_passing_ase": 49.5,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 65.74,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_10": {
-    "ase": 9.66,
-    "sda": 32.95,
-    "floor_area_passing_ase": 79.5,
-    "floor_area_passing_sda": 29.0,
-    "total_floor_area": 88.0
+    "ase_note": "The Annual Sunlight Exposure is greater than 10% for space: Room_10. Identify in writing how the space is designed to address glare.",
+    "ase": 11.51,
+    "sda": 23.79,
+    "floor_area_passing_ase": 95.57,
+    "floor_area_passing_sda": 25.69,
+    "total_floor_area": 108.0
   },
   "Room_11": {
-    "ase": 5.68,
-    "sda": 18.75,
-    "floor_area_passing_ase": 83.0,
-    "floor_area_passing_sda": 16.5,
-    "total_floor_area": 88.0
+    "ase": 8.33,
+    "sda": 17.4,
+    "floor_area_passing_ase": 99.0,
+    "floor_area_passing_sda": 18.79,
+    "total_floor_area": 108.0
   },
   "Room_12": {
     "ase": 0.0,
-    "sda": 62.27,
-    "floor_area_passing_ase": 55.0,
-    "floor_area_passing_sda": 34.25,
-    "total_floor_area": 55.0
+    "sda": 49.41,
+    "floor_area_passing_ase": 72.0,
+    "floor_area_passing_sda": 35.57,
+    "total_floor_area": 72.0
   },
   "Room_13": {
-    "ase": 4.55,
+    "ase": 4.35,
     "sda": 100.0,
-    "floor_area_passing_ase": 52.5,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 68.87,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_14": {
-    "ase": 0.45,
+    "ase": 0.0,
     "sda": 100.0,
-    "floor_area_passing_ase": 54.75,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 72.0,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_15": {
-    "ase": 1.82,
+    "ase": 0.79,
     "sda": 100.0,
-    "floor_area_passing_ase": 54.0,
-    "floor_area_passing_sda": 55.0,
-    "total_floor_area": 55.0
+    "floor_area_passing_ase": 71.43,
+    "floor_area_passing_sda": 72.0,
+    "total_floor_area": 72.0
   },
   "Room_16": {
     "ase_note": "The Annual Sunlight Exposure is greater than 10% for space: Room_16. Identify in writing how the space is designed to address glare.",
-    "ase": 11.65,
-    "sda": 34.66,
-    "floor_area_passing_ase": 77.75,
-    "floor_area_passing_sda": 30.5,
-    "total_floor_area": 88.0
+    "ase": 13.24,
+    "sda": 25.25,
+    "floor_area_passing_ase": 93.71,
+    "floor_area_passing_sda": 27.26,
+    "total_floor_area": 108.0
   },
   "Room_17": {
-    "ase": 7.1,
-    "sda": 28.41,
-    "floor_area_passing_ase": 81.75,
-    "floor_area_passing_sda": 25.0,
-    "total_floor_area": 88.0
+    "ase": 8.58,
+    "sda": 22.06,
+    "floor_area_passing_ase": 98.74,
+    "floor_area_passing_sda": 23.82,
+    "total_floor_area": 108.0
   }
 }
