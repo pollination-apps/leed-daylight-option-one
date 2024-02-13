@@ -33,17 +33,17 @@ def main():
         or st.session_state['load_method'] == 'Try the sample run':
         if st.session_state['load_method'] == 'Try the sample run':
             folder, vtjks_file, summary, summary_grid, states_schedule, \
-                states_schedule_err = load_from_folder(st.session_state.sample_folder)
+                states_schedule_err, hb_model = load_from_folder(st.session_state.sample_folder)
         else:
             check_run_recipe(study_tab)
             folder, vtjks_file, summary, summary_grid, states_schedule, \
-                states_schedule_err = load_results()
+                states_schedule_err, hb_model = load_results()
 
         with study_tab:
             st.info('Please go to the next tab to show the results!')
 
         with summary_tab:
-            process_summary(summary)
+            process_summary(summary, hb_model)
             show_errors(summary, states_schedule_err)
             process_space(summary_grid, states_schedule_err)
 

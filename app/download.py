@@ -19,6 +19,7 @@ def download_files() -> None:
     _, info = next(run.job.runs_dataframe.input_artifacts.iterrows())
     model_dict = json.load(run.job.download_artifact(info.model))
     hb_model = Model.from_dict(model_dict)
+    hb_model.to_hbjson(name='model', folder=run_folder)
 
     leed_summary_folder = run_folder.joinpath('leed-summary')
 

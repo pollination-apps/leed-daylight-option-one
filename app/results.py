@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Tuple
 import streamlit as st
 
+from honeybee.model import Model
+
 from download import download_files
 
 
@@ -23,21 +25,24 @@ def load_from_folder(folder: Path) \
 
     vtjks_file = folder.joinpath('vis_set.vtkjs')
 
+    hb_model = Model.from_hbjson(folder.joinpath('model.hbjson'))
+
     return (leed_summary, vtjks_file, summary, summary_grid, states_schedule,
-            states_schedule_err)
+            states_schedule_err, hb_model)
 
 
 def load_results() -> tuple:
     """Load results from a run folder. If the the run folder does not exist
     the files will be downloaded to the run folder."""
     if not st.session_state.run_folder.exists():
+        st.session_state.run_folder.mkdir()
         # download results to run folder
         with st.spinner('Downloading files...'):
             download_files()
 
     # load results from run folder
     leed_summary, vtjks_file, summary, summary_grid, states_schedule, \
-        states_schedule_err = load_from_folder(st.session_state.run_folder)
+        states_schedule_err, hb_model = load_from_folder(st.session_state.run_folder)
 
     return (leed_summary, vtjks_file, summary, summary_grid, states_schedule,
-            states_schedule_err)
+            states_schedule_err, hb_model)

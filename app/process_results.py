@@ -11,8 +11,15 @@ from on_change import (radio_show_all_grids, radio_show_all,
     multiselect_ase, legend_min_on_change, legend_max_on_change)
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 
+UNITS_AREA = {
+    'Meters': 'm',
+    'Millimeters': 'mm',
+    'Feet': 'ft',
+    'Inches': 'in',
+    'Centimeters': 'cm'
+}
 
-def process_summary(summary: dict):
+def process_summary(summary: dict, hb_model):
     """Process summary."""
     points = summary['credits']
     if points > 1:
@@ -38,17 +45,17 @@ def process_summary(summary: dict):
     if 'total_floor_area' in summary:
         floor_area_passing_sda = summary['floor_area_passing_sda']
         floor_area_passing_sda_text = \
-            f'Floor area passing sDA: {round(floor_area_passing_sda, 2)}'
-        st.markdown(floor_area_passing_sda_text)
+            f'Floor area passing sDA: {round(floor_area_passing_sda, 2)} {UNITS_AREA[hb_model.units]}<sup style>2</sup>'
+        st.markdown(floor_area_passing_sda_text, unsafe_allow_html=True)
 
         floor_area_passing_ase = summary['floor_area_passing_ase']
         floor_area_passing_ase_text = \
-            f'Floor area passing ASE: {round(floor_area_passing_ase, 2)}'
-        st.markdown(floor_area_passing_ase_text)
+            f'Floor area passing ASE: {round(floor_area_passing_ase, 2)} {UNITS_AREA[hb_model.units]}<sup style>2</sup>'
+        st.markdown(floor_area_passing_ase_text, unsafe_allow_html=True)
 
         total_floor_area = summary['total_floor_area']
-        total_floor_area_text = f'Total floor area: {round(total_floor_area, 2)}'
-        st.markdown(total_floor_area_text)
+        total_floor_area_text = f'Total floor area: {round(total_floor_area, 2)} {UNITS_AREA[hb_model.units]}<sup style>2</sup>'
+        st.markdown(total_floor_area_text, unsafe_allow_html=True)
 
         df.rename(columns={
             'floor_area_passing_sda': 'Floor area passing sDA',
