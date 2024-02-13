@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import numpy as np
 from io import BytesIO
+from collections import OrderedDict
 from pdfrw import PdfReader, PdfDict
 from pdfrw.buildxobj import pagexobj
 from pdfrw.toreportlab import makerl
@@ -32,7 +33,7 @@ from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 
 
 folder, vtjks_file, summary, summary_grid, states_schedule, \
-    states_schedule_err = load_from_folder(Path('./app/sample'))
+    states_schedule_err, hb_model = load_from_folder(Path('./app/sample'))
 
 
 class NumberedPageCanvas(canvas.Canvas):
@@ -445,34 +446,125 @@ def create_pdf(
     with open(folder.joinpath('grids_info.json')) as json_file:
         grids_info = json.load(json_file)
 
-    def scale(drawing: Drawing, scaling_factor: float = None, width: float = None, height: float = None):
-        if all(v is None for v in [scaling_factor, width, height]):
-            raise ValueError
-        
-        if scaling_factor:
-            scaling_x = scaling_factor
-            scaling_y = scaling_factor
-            
-            drawing.width = drawing.minWidth() * scaling_x
-            drawing.height = drawing.height * scaling_y
-            drawing.scale(scaling_x, scaling_y)
-            return drawing
-        if width:
-            scaling_factor = width / drawing.width
-            drawing.width = width
-            drawing.height = drawing.height * scaling_factor
-            drawing.scale(scaling_factor, scaling_factor)
-            return drawing
-        if height:
-            scaling_factor = height / drawing.height
-            drawing.height = height
-            drawing.width = drawing.width * scaling_factor
-            drawing.scale(scaling_factor, scaling_factor)
-            return drawing
-
-    hb_model: Model = Model.from_hbjson(Path('app/sample/leed_model.hbjson'))
     sensor_grids = hb_model.properties.radiance.sensor_grids
     sensor_grids = {sg.full_identifier: sg for sg in sensor_grids}
+
+    rooms_by_story = {story_id: [] for story_id in sorted(hb_model.stories)}
+    for room in hb_model.rooms:
+        if room.story in rooms_by_story:
+            rooms_by_story[room.story].append(room)
+    for story_id, rooms in rooms_by_story.items():
+        story.append(Paragraph(story_id, style=styles['h1']))
+        horiz_bound = [room.horizontal_boundary() for room in rooms]
+        rooms_min = Room._calculate_min(horiz_bound)
+        rooms_max = Room._calculate_max(horiz_bound)
+
+        _width = rooms_max.x - rooms_min.x
+        _height = rooms_max.y - rooms_min.y
+        _ratio = _width / _height
+        drawing_scale = 500
+        drawing_width = (_width / drawing_scale) * 1000 * mm
+        drawing_height = drawing_width / _ratio
+        da_drawing = Drawing(drawing_width, drawing_height)
+        da_drawing_pf = Drawing(drawing_width, drawing_height)
+        hrs_above_drawing = Drawing(drawing_width, drawing_height)
+        hrs_above_drawing_pf = Drawing(drawing_width, drawing_height)
+
+        for room in rooms:
+            for sensor_grid in sensor_grids.values():
+                if sensor_grid.room_identifier == room.identifier:
+                    mesh = sensor_grid.mesh
+                    faces = mesh.faces
+                    faces_centroids = mesh.face_centroids
+
+                    da = np.loadtxt(Path(f'app/sample/leed-summary/results/da/{sensor_grid.full_identifier}.da'))
+                    da_color_range = ColorRange(colors=Colorset.annual_comfort(), domain=[0, 100])
+                    hrs_above = np.loadtxt(Path(f'app/sample/leed-summary/results/ase_hours_above/{sensor_grid.full_identifier}.res'))
+                    hrs_above_color_range = ColorRange(colors=Colorset.original(), domain=[0, 250])
+                    for face, face_centroid, _da, _hrs in zip(faces, faces_centroids, da, hrs_above):
+                        vertices = [mesh.vertices[i] for i in face]
+                        points = []
+                        for vertex in vertices:
+                            points.extend(
+                                [
+                                    np.interp(vertex.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                                    np.interp(vertex.y, [rooms_min.y, rooms_max.y], [0, drawing_height])
+                                ]
+                            )
+
+                        lb_color =  da_color_range.color(_da)
+                        fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
+                        polygon = Polygon(points=points, fillColor=fillColor, strokeColor=fillColor, strokeWidth=0)
+                        da_drawing.add(polygon)
+
+                        if _da >= 50:
+                            fillColor = colors.Color(0 / 255, 195 / 255, 0 / 255)
+                        else:
+                            fillColor = colors.Color(155 / 255, 155 / 255, 155 / 255)
+                        polygon = Circle(
+                            np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                            np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
+                            ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
+                            fillColor=fillColor,
+                            strokeWidth=0,
+                            strokeOpacity=0
+                        )
+                        da_drawing_pf.add(polygon)
+
+                        lb_color =  hrs_above_color_range.color(_hrs)
+                        fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
+                        polygon = Circle(
+                            np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                            np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
+                            ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
+                            fillColor=fillColor,
+                            strokeWidth=0,
+                            strokeOpacity=0
+                        )
+                        hrs_above_drawing.add(polygon)
+
+                        if _hrs > 250:
+                            fillColor = colors.Color(155 / 255, 155 / 255, 155 / 255)
+                        else:
+                            fillColor = colors.Color(0 / 255, 195 / 255, 0 / 255)
+                        polygon = Circle(
+                            np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                            np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
+                            ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
+                            fillColor=fillColor,
+                            strokeWidth=0,
+                            strokeOpacity=0
+                        )
+                        hrs_above_drawing_pf.add(polygon)
+
+            horiz_bound = room.horizontal_boundary()
+            horiz_bound_vertices = horiz_bound.vertices
+            points = []
+            horiz_bound_vertices = horiz_bound_vertices + (horiz_bound_vertices[0],)
+            for vertex in horiz_bound_vertices:
+                points.extend(
+                    [
+                        np.interp(vertex.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                        np.interp(vertex.y, [rooms_min.y, rooms_max.y], [0, drawing_height])
+                    ]
+                )
+            polygon = Polygon(points=points, strokeWidth=0.2, fillOpacity=0)
+            da_drawing.add(polygon)
+            da_drawing_pf.add(polygon)
+            hrs_above_drawing.add(polygon)
+            hrs_above_drawing_pf.add(polygon)
+        story.append(Paragraph('Daylight Autonomy', style=styles['h2']))
+        story.append(da_drawing)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+        story.append(Paragraph('Daylight Autonomy | Pass / Fail', style=styles['h2']))
+        story.append(da_drawing_pf)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+        story.append(Paragraph('Direct Sunlight', style=styles['h2']))
+        story.append(hrs_above_drawing)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+        story.append(Paragraph('Direct Sunlight | Pass / Fail', style=styles['h2']))
+        story.append(hrs_above_drawing_pf)
+        story.append(PageBreak())
 
     for grid_id, values in summary_grid.items():
         story.append(Paragraph(grid_id, style=styles['h1']))
@@ -517,14 +609,13 @@ def create_pdf(
         room_max = room.max
         horiz_bound_vertices = horiz_bound.vertices
         mesh = sensor_grid.mesh
-        mesh_min = mesh.min
-        mesh_max = mesh.max
         faces = mesh.faces
         faces_centroids = mesh.face_centroids
         _width = room_max.x - room_min.x
         _height = room_max.y - room_min.y
         _ratio = _width / _height
-        drawing_width = (_width / 200) * 1000 * mm
+        drawing_scale = 200
+        drawing_width = (_width / drawing_scale) * 1000 * mm
         drawing_height = drawing_width / _ratio
         da_drawing = Drawing(drawing_width, drawing_height)
         da = np.loadtxt(Path(f'app/sample/leed-summary/results/da/{grid_id}.da'))
@@ -553,7 +644,7 @@ def create_pdf(
             polygon = Circle(
                 np.interp(face_centroid.x, [room_min.x, room_max.x], [0, drawing_width]),
                 np.interp(face_centroid.y, [room_min.y, room_max.y], [0, drawing_height]),
-                ((2 * 304.8 * mm) / 2 ) * 0.75 / 200,
+                ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
                 fillColor=fillColor,
                 #strokeColor=fillColor,
                 strokeWidth=0,
@@ -571,7 +662,6 @@ def create_pdf(
                 ]
             )
         polygon = Polygon(points=points, strokeWidth=0.5, fillOpacity=0)
-        polyline = PolyLine(points=points, strokeWidth=2, strokeLineCap=0, strokeLineJoin=0)
         hrs_above_drawing.add(polygon)
         da_drawing.add(polygon)
 
@@ -647,7 +737,6 @@ def create_pdf(
 
         ase_note = values.get('ase_note')
         if ase_note:
-            pass
             story.append(Paragraph(ase_note, style=styles['Normal']))
 
 
@@ -714,6 +803,7 @@ def create_pdf(
         #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
         # story.append(CondPageBreak())
+        #break
 
     pollination_image = 'assets/images/pollination.png'
     # Build and save the PDF
