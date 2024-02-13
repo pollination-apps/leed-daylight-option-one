@@ -142,7 +142,7 @@ def figure_aperture_group_schedule(aperture_group: str,
 
     fig_title = {
         'text': aperture_group + ' - Shading transmittance: ' + '{:.0%}'.format(round(shd_trans, 3)),
-        'y': 1,
+        'y': 0.95,
         'x': 0.5,
         'xanchor': 'center',
         'yanchor': 'top'

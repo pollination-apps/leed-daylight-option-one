@@ -25,7 +25,7 @@ def initialize():
         st.session_state.options = [
             'Load from a project', 'Try the sample run'
         ]
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     if 'load_method' not in st.session_state:
         if 'url' in query_params:
             st.session_state.active_option = 'Load from a URL'
