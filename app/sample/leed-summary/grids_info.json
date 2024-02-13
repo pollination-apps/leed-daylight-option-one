@@ -1,280 +1,280 @@
 [
   {
-    "count": 220,
+    "count": 253,
     "name": "Room_1",
     "identifier": "Room_1",
     "group": "",
     "full_id": "Room_1",
     "light_path": [
       [
-        "Room_1_ApertureGroup_0"
+        "Room_1_54bedd38_ApertureGroup_0"
       ],
       [
-        "Room_1_ApertureGroup_1"
+        "Room_1_54bedd38_ApertureGroup_1"
       ],
       [
-        "Room_1_ApertureGroup_2"
+        "Room_1_54bedd38_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 160,
+    "count": 187,
     "name": "Room_2",
     "identifier": "Room_2",
     "group": "",
     "full_id": "Room_2",
     "light_path": [
       [
-        "Room_2_ApertureGroup_0"
+        "Room_2_33f85331_ApertureGroup_0"
       ],
       [
-        "Room_2_ApertureGroup_1"
+        "Room_2_33f85331_ApertureGroup_1"
       ],
       [
-        "Room_2_ApertureGroup_2"
+        "Room_2_33f85331_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 352,
+    "count": 408,
     "name": "Room_3",
     "identifier": "Room_3",
     "group": "",
     "full_id": "Room_3",
     "light_path": [
       [
-        "Room_3_ApertureGroup_0"
+        "Room_3_271bb9f1_ApertureGroup_0"
       ],
       [
-        "Room_3_ApertureGroup_1"
+        "Room_3_271bb9f1_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 276,
     "name": "Room_4",
     "identifier": "Room_4",
     "group": "",
     "full_id": "Room_4",
     "light_path": [
       [
-        "Room_4_ApertureGroup_0"
+        "Room_4_dee1439f_ApertureGroup_0"
       ],
       [
-        "Room_4_ApertureGroup_1"
+        "Room_4_dee1439f_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 276,
     "name": "Room_5",
     "identifier": "Room_5",
     "group": "",
     "full_id": "Room_5",
     "light_path": [
       [
-        "Room_5_ApertureGroup_0"
+        "Room_5_706923a4_ApertureGroup_0"
       ],
       [
-        "Room_5_ApertureGroup_1"
+        "Room_5_706923a4_ApertureGroup_1"
       ],
       [
-        "Room_5_ApertureGroup_2"
+        "Room_5_706923a4_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 352,
+    "count": 408,
     "name": "Room_6",
     "identifier": "Room_6",
     "group": "",
     "full_id": "Room_6",
     "light_path": [
       [
-        "Room_6_ApertureGroup_0"
+        "Room_6_444baddd_ApertureGroup_0"
       ],
       [
-        "Room_6_ApertureGroup_1"
+        "Room_6_444baddd_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 276,
     "name": "Room_7",
     "identifier": "Room_7",
     "group": "",
     "full_id": "Room_7",
     "light_path": [
       [
-        "Room_7_ApertureGroup_0"
+        "Room_7_e80378e0_ApertureGroup_0"
       ],
       [
-        "Room_7_ApertureGroup_1"
+        "Room_7_e80378e0_ApertureGroup_1"
       ],
       [
-        "Room_7_ApertureGroup_2"
+        "Room_7_e80378e0_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 253,
     "name": "Room_8",
     "identifier": "Room_8",
     "group": "",
     "full_id": "Room_8",
     "light_path": [
       [
-        "Room_8_ApertureGroup_0"
+        "Room_8_ce1b2839_ApertureGroup_0"
       ],
       [
-        "Room_8_ApertureGroup_1"
+        "Room_8_ce1b2839_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 253,
     "name": "Room_9",
     "identifier": "Room_9",
     "group": "",
     "full_id": "Room_9",
     "light_path": [
       [
-        "Room_9_ApertureGroup_0"
+        "Room_9_53cf9728_ApertureGroup_0"
       ],
       [
-        "Room_9_ApertureGroup_1"
+        "Room_9_53cf9728_ApertureGroup_1"
       ],
       [
-        "Room_9_ApertureGroup_2"
+        "Room_9_53cf9728_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 352,
+    "count": 391,
     "name": "Room_10",
     "identifier": "Room_10",
     "group": "",
     "full_id": "Room_10",
     "light_path": [
       [
-        "Room_10_ApertureGroup_0"
+        "Room_10_9ee29f75_ApertureGroup_0"
       ],
       [
-        "Room_10_ApertureGroup_1"
+        "Room_10_9ee29f75_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 352,
+    "count": 408,
     "name": "Room_11",
     "identifier": "Room_11",
     "group": "",
     "full_id": "Room_11",
     "light_path": [
       [
-        "Room_11_ApertureGroup_0"
+        "Room_11_ff97be71_ApertureGroup_0"
       ],
       [
-        "Room_11_ApertureGroup_1"
+        "Room_11_ff97be71_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 253,
     "name": "Room_12",
     "identifier": "Room_12",
     "group": "",
     "full_id": "Room_12",
     "light_path": [
       [
-        "Room_12_ApertureGroup_0"
+        "Room_12_620034ad_ApertureGroup_0"
       ],
       [
-        "Room_12_ApertureGroup_1"
+        "Room_12_620034ad_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 253,
     "name": "Room_13",
     "identifier": "Room_13",
     "group": "",
     "full_id": "Room_13",
     "light_path": [
       [
-        "Room_13_ApertureGroup_0"
+        "Room_13_defa2b70_ApertureGroup_0"
       ],
       [
-        "Room_13_ApertureGroup_1"
+        "Room_13_defa2b70_ApertureGroup_1"
       ],
       [
-        "Room_13_ApertureGroup_2"
+        "Room_13_defa2b70_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 276,
     "name": "Room_14",
     "identifier": "Room_14",
     "group": "",
     "full_id": "Room_14",
     "light_path": [
       [
-        "Room_14_ApertureGroup_0"
+        "Room_14_9abfc0d6_ApertureGroup_0"
       ],
       [
-        "Room_14_ApertureGroup_1"
+        "Room_14_9abfc0d6_ApertureGroup_1"
       ],
       [
-        "Room_14_ApertureGroup_2"
+        "Room_14_9abfc0d6_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 220,
+    "count": 253,
     "name": "Room_15",
     "identifier": "Room_15",
     "group": "",
     "full_id": "Room_15",
     "light_path": [
       [
-        "Room_15_ApertureGroup_0"
+        "Room_15_22e247a2_ApertureGroup_0"
       ],
       [
-        "Room_15_ApertureGroup_1"
+        "Room_15_22e247a2_ApertureGroup_1"
       ],
       [
-        "Room_15_ApertureGroup_2"
+        "Room_15_22e247a2_ApertureGroup_2"
       ]
     ]
   },
   {
-    "count": 352,
+    "count": 408,
     "name": "Room_16",
     "identifier": "Room_16",
     "group": "",
     "full_id": "Room_16",
     "light_path": [
       [
-        "Room_16_ApertureGroup_0"
+        "Room_16_ebec9e9b_ApertureGroup_0"
       ],
       [
-        "Room_16_ApertureGroup_1"
+        "Room_16_ebec9e9b_ApertureGroup_1"
       ]
     ]
   },
   {
-    "count": 352,
+    "count": 408,
     "name": "Room_17",
     "identifier": "Room_17",
     "group": "",
     "full_id": "Room_17",
     "light_path": [
       [
-        "Room_17_ApertureGroup_0"
+        "Room_17_3d198dd6_ApertureGroup_0"
       ],
       [
-        "Room_17_ApertureGroup_1"
+        "Room_17_3d198dd6_ApertureGroup_1"
       ]
     ]
   }
