@@ -17,7 +17,8 @@ from reportlab.lib.units import mm, cm, inch
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, _baseFontNameB
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
-from reportlab.graphics.shapes import Drawing, Circle, Rect, Polygon, Line, PolyLine, Path as RLPath
+from reportlab.graphics.shapes import Drawing, Circle, Rect, Polygon, Line, PolyLine, Group, String
+from reportlab.graphics.widgets.adjustableArrow import AdjustableArrow
 from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Paragraph, \
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
     Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether
@@ -207,6 +208,14 @@ class PdfImage(Flowable):
         canv.scale(xscale, yscale)
         canv.doForm(xobj_name)
         canv.restoreState()
+
+
+def scale_drawing(drawing: Drawing, sx: float, sy: float):
+    new_drawing = drawing.copy()
+    new_drawing.scale(sx, sy)
+    new_drawing.width = new_drawing.width * sx
+    new_drawing.height = new_drawing.height * sy
+    return new_drawing
 
 
 def create_pdf(
@@ -553,17 +562,134 @@ def create_pdf(
             da_drawing_pf.add(polygon)
             hrs_above_drawing.add(polygon)
             hrs_above_drawing_pf.add(polygon)
+
+            # draw vertical apertures
+            for aperture in room.apertures:
+                if aperture.normal.z == 0:
+                    aperture_min = aperture.geometry.lower_left_corner
+                    aperture_max = aperture.geometry.lower_right_corner
+                    strokeColor = colors.Color(95 / 255, 195 / 255, 255 / 255)
+                    line = Line(np.interp(aperture_min.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                                np.interp(aperture_min.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
+                                np.interp(aperture_max.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
+                                np.interp(aperture_max.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
+                                strokeColor=strokeColor,
+                                strokeWidth=0.5
+                                )
+                    da_drawing.add(line)
+                    da_drawing_pf.add(line)
+                    hrs_above_drawing.add(line)
+                    hrs_above_drawing_pf.add(line)
+
+        def create_north_arrow(north: float, radius: float) -> Group:
+            north_arrow = Group(
+                Polygon(points=[-radius*0.2, 0, radius*0.2, 0, 0, radius], fillColor=colors.black, strokeColor=colors.black, strokeWidth=0),
+                Circle(0, 0, radius, strokeWidth=radius*0.025, fillOpacity=0),
+                PolyLine([-radius, 0, radius, 0], strokeWidth=radius*0.025/2)
+            )
+            north_arrow.rotate(north)
+            return north_arrow
+
+        def draw_north_arrow(north: float, radius: float) -> Drawing:
+            north_arrow_drawing = Drawing(width=radius*2, height=radius*2)
+            group = create_north_arrow(north, radius)
+            for elem in group.contents:
+                north_arrow_drawing.add(elem)
+            north_arrow_drawing.translate(radius, radius)
+            return north_arrow_drawing
+
+        def translate_group_relative(group: Group, anchor_group: Group, anchor: str, padding: float):
+            anchor_bounds = anchor_group.getBounds()
+            group_bounds = group.getBounds()
+            if anchor == 'e':
+                new_x = anchor_bounds[2]
+                new_y = (anchor_bounds[1] + anchor_bounds[3]) / 2
+                old_y = (group_bounds[1] + group_bounds[3]) / 2
+                dx = new_x - group_bounds[0] + padding
+                dy = new_y - old_y
+                group.translate(dx, dy)
+            else:
+                raise NotImplementedError()
+
+        def drawing_dimensions_from_bounds(drawing: Drawing):
+            """Set the width and height based on the boundaries of the contents."""
+            drawing_bounds = drawing.getBounds()
+            if drawing_bounds[0] != 0 or drawing_bounds[1] != 0:
+                dx = 0 - drawing_bounds[0]
+                dy = 0 - drawing_bounds[1]
+                drawing.translate(dx, dy)
+            drawing_bounds = drawing.getBounds()
+            drawing.width = abs(drawing_bounds[2] - drawing_bounds[0])
+            drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
+
+        north_arrow_drawing = draw_north_arrow(north=0, radius=10)
         story.append(Paragraph('Daylight Autonomy', style=styles['h2']))
-        story.append(da_drawing)
+        da_group = KeepTogether(flowables=[da_drawing, Spacer(width=0*cm, height=0.5*cm), north_arrow_drawing])
+        story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
+
         story.append(Paragraph('Daylight Autonomy | Pass / Fail', style=styles['h2']))
-        story.append(da_drawing_pf)
+
+        legend_north_drawing = Drawing(0, 0)
+        north_arrow_group = create_north_arrow(0, 10)
+        group_bounds = north_arrow_group.getBounds()
+        if group_bounds[0] < 0 or group_bounds[1] < 0:
+            dx = 0
+            dy = 0
+            if group_bounds[0] < 0:
+                dx = abs(group_bounds[0])
+            if group_bounds[1] < 0:
+                dy = abs(group_bounds[1])
+            north_arrow_group.translate(dx, dy)
+        legend_north_drawing.add(north_arrow_group)
+
+        rectangles = Group(
+            Rect(-50, 0, 50, 5, fillColor=colors.Color(155 / 255, 155 / 255, 155 / 255), strokeWidth=0, strokeColor=colors.Color(155 / 255, 155 / 255, 155 / 255)),
+            Rect(0, 0, 50, 5, fillColor=colors.Color(0 / 255, 195 / 255, 0 / 255), strokeWidth=0, strokeColor=colors.Color(0 / 255, 195 / 255, 0 / 255)),
+            String(x=0, y=-5*1.1, text='50%',textAnchor='middle', fontName='Helvetica', fontSize=5),
+            String(x=-50, y=-5*1.1, text='0%',textAnchor='start', fontName='Helvetica', fontSize=5),
+            String(x=50, y=-5*1.1, text='100%',textAnchor='end', fontName='Helvetica', fontSize=5),
+            String(x=-50*1.1, y=0, text='Daylight Autonomy (300 lux)',textAnchor='end', fontName='Helvetica', fontSize=5)
+        )
+
+        translate_group_relative(rectangles, north_arrow_group, 'e', 5)
+        legend_north_drawing.add(rectangles)
+        drawing_dimensions_from_bounds(legend_north_drawing)
+        da_pf_group = KeepTogether(flowables=[da_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
+
         story.append(Paragraph('Direct Sunlight', style=styles['h2']))
         story.append(hrs_above_drawing)
         story.append(Spacer(width=0*cm, height=0.5*cm))
+
         story.append(Paragraph('Direct Sunlight | Pass / Fail', style=styles['h2']))
-        story.append(hrs_above_drawing_pf)
+        legend_north_drawing = Drawing(0, 0)
+        north_arrow_group = create_north_arrow(0, 10)
+        group_bounds = north_arrow_group.getBounds()
+        if group_bounds[0] < 0 or group_bounds[1] < 0:
+            dx = 0
+            dy = 0
+            if group_bounds[0] < 0:
+                dx = abs(group_bounds[0])
+            if group_bounds[1] < 0:
+                dy = abs(group_bounds[1])
+            north_arrow_group.translate(dx, dy)
+        legend_north_drawing.add(north_arrow_group)
+
+        rectangles = Group(
+            Rect(-50, 0, 50, 5, fillColor=colors.Color(0 / 255, 195 / 255, 0 / 255), strokeWidth=0, strokeColor=colors.Color(0 / 255, 195 / 255, 0 / 255)),
+            Rect(0, 0, 50, 5, fillColor=colors.Color(155 / 255, 155 / 255, 155 / 255), strokeWidth=0, strokeColor=colors.Color(155 / 255, 155 / 255, 155 / 255)),
+            String(x=0, y=-5*1.1, text='250 hrs',textAnchor='middle', fontName='Helvetica', fontSize=5),
+            String(x=-50, y=-5*1.1, text='0 hrs',textAnchor='start', fontName='Helvetica', fontSize=5),
+            String(x=-50*1.1, y=0, text='Direct Sunlight (1000 lux)',textAnchor='end', fontName='Helvetica', fontSize=5)
+        )
+
+        translate_group_relative(rectangles, north_arrow_group, 'e', 5)
+        legend_north_drawing.add(rectangles)
+        drawing_dimensions_from_bounds(legend_north_drawing)
+        hrs_above_pf_group = KeepTogether(flowables=[hrs_above_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        story.append(hrs_above_pf_group)
         story.append(PageBreak())
 
     for grid_id, values in summary_grid.items():
@@ -646,7 +772,6 @@ def create_pdf(
                 np.interp(face_centroid.y, [room_min.y, room_max.y], [0, drawing_height]),
                 ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
                 fillColor=fillColor,
-                #strokeColor=fillColor,
                 strokeWidth=0,
                 strokeOpacity=0
             )
@@ -689,13 +814,6 @@ def create_pdf(
         _heatmap_table.setStyle(table_style)
         story.append(_heatmap_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
-
-        def scale_drawing(drawing: Drawing, sx: float, sy: float):
-            new_drawing = drawing.copy()
-            new_drawing.scale(sx, sy)
-            new_drawing.width = new_drawing.width * sx
-            new_drawing.height = new_drawing.height * sy
-            return new_drawing
 
         if grid_id == 'Room_2':
             table_style = TableStyle([
@@ -803,7 +921,7 @@ def create_pdf(
         #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
         # story.append(CondPageBreak())
-        #break
+        break
 
     pollination_image = 'assets/images/pollination.png'
     # Build and save the PDF
