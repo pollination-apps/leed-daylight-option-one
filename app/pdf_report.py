@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import numpy as np
 from io import BytesIO
+import datetime
 from collections import OrderedDict
 from pdfrw import PdfReader, PdfDict
 from pdfrw.buildxobj import pagexobj
@@ -27,6 +28,7 @@ from svglib.svglib import svg2rlg
 from ladybug.analysisperiod import AnalysisPeriod
 from ladybug.datacollection import HourlyContinuousCollection
 from ladybug.color import Colorset, ColorRange
+from ladybug.legend import Legend, LegendParameters
 from honeybee.model import Model, Room
 
 from results import load_from_folder
@@ -46,22 +48,20 @@ class NumberedPageCanvas(canvas.Canvas):
     """
 
     def __init__(self, *args, **kwargs):
-        """Constructor"""
+        """Constructor."""
+        self.skip_pages = kwargs.pop('skip_pages', 0)
+        self.start_on_skip_pages = kwargs.pop('start_on_skip_pages', None)
         super().__init__(*args, **kwargs)
         self.pages = []
 
     def showPage(self):
-        """
-        On a page break, add information to the list
-        """
+        """On a page break, add information to the list."""
         self.pages.append(dict(self.__dict__))
         self._doc.pageCounter += 1
         self._startPage()
 
     def save(self):
-        """
-        Add the page number to each page (page x of y)
-        """
+        """Add the page number to each page (page x of y)."""
         page_count = len(self.pages)
 
         for page in self.pages:
@@ -72,12 +72,16 @@ class NumberedPageCanvas(canvas.Canvas):
         super().save()
 
     def draw_page_number(self, page_count):
-        """
-        Add the page number
-        """
-        page = "Page %s of %s" % (self._pageNumber, page_count)
-        self.setFont("Helvetica", 9)
-        self.drawRightString(195 * mm, 15 * mm, page)
+        """Add the page number."""
+        if self._pageNumber > self.skip_pages:
+            if self.start_on_skip_pages:
+                page = "Page %s of %s" % (self._pageNumber - self.skip_pages, page_count - self.skip_pages)
+                self.setFont("Helvetica", 9)
+                self.drawRightString(195 * mm, 15 * mm, page)
+            else:
+                page = "Page %s of %s" % (self._pageNumber, page_count)
+                self.setFont("Helvetica", 9)
+                self.drawRightString(195 * mm, 15 * mm, page)
 
 
 def _header(canvas, doc, content, logo):
@@ -218,6 +222,61 @@ def scale_drawing(drawing: Drawing, sx: float, sy: float):
     return new_drawing
 
 
+def scale_drawing_to_width(drawing: Drawing, width: float):
+    new_drawing = drawing.copy()
+    x1, y1, x2, y2 = new_drawing.getBounds()
+    contents_width = x2 - x1
+    contents_height = y2 - y1
+    scale_factor = width / contents_width
+    new_height = contents_height * scale_factor
+    new_drawing.scale(sx=scale_factor, sy=scale_factor)
+    new_drawing.width = width
+    new_drawing.height = new_height
+    return new_drawing
+
+
+def create_north_arrow(north: float, radius: float) -> Group:
+    north_arrow = Group(
+        Polygon(points=[-radius*0.2, 0, radius*0.2, 0, 0, radius], fillColor=colors.black, strokeColor=colors.black, strokeWidth=0),
+        Circle(0, 0, radius, strokeWidth=radius*0.025, fillOpacity=0),
+        PolyLine([-radius, 0, radius, 0], strokeWidth=radius*0.025/2)
+    )
+    north_arrow.rotate(north)
+    return north_arrow
+
+def draw_north_arrow(north: float, radius: float) -> Drawing:
+    north_arrow_drawing = Drawing(width=radius*2, height=radius*2)
+    group = create_north_arrow(north, radius)
+    for elem in group.contents:
+        north_arrow_drawing.add(elem)
+    north_arrow_drawing.translate(radius, radius)
+    return north_arrow_drawing
+
+def translate_group_relative(group: Group, anchor_group: Group, anchor: str, padding: float):
+    anchor_bounds = anchor_group.getBounds()
+    group_bounds = group.getBounds()
+    if anchor == 'e':
+        new_x = anchor_bounds[2]
+        new_y = (anchor_bounds[1] + anchor_bounds[3]) / 2
+        old_y = (group_bounds[1] + group_bounds[3]) / 2
+        dx = new_x - group_bounds[0] + padding
+        dy = new_y - old_y
+        group.translate(dx, dy)
+    else:
+        raise NotImplementedError()
+
+def drawing_dimensions_from_bounds(drawing: Drawing):
+    """Set the width and height based on the boundaries of the contents."""
+    drawing_bounds = drawing.getBounds()
+    if drawing_bounds[0] != 0 or drawing_bounds[1] != 0:
+        dx = 0 - drawing_bounds[0]
+        dy = 0 - drawing_bounds[1]
+        drawing.translate(dx, dy)
+    drawing_bounds = drawing.getBounds()
+    drawing.width = abs(drawing_bounds[2] - drawing_bounds[0])
+    drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
+
+
 def create_pdf(
         output_file, pagesize: tuple = A4, left_margin: float = 1.5*cm,
         right_margin: float = 1.5*cm, top_margin: float = 2*cm,
@@ -276,6 +335,16 @@ def create_pdf(
 
     story = []
     #story.append(NextPageTemplate('title-page'))
+    front_page_table = Table(data=
+        [
+            [Paragraph("LEED Daylight Option I Report", styles['h2'])],
+            [Paragraph('Project: My Project')],
+            [Paragraph('Prepared by: Mikkel Pedersen')],
+            [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}')]
+        ]
+    )
+    story.append(front_page_table)
+    story.append(PageBreak())
     document_title = Paragraph("LEED Daylight Option I", title_style)
     story.append(document_title)
 
@@ -307,25 +376,16 @@ def create_pdf(
         else:
             return colors.Color(0, 255 / 255, 0, 0.3)
 
-    _sda_table = Table(data=[['Spatial Daylight Autonomy'], [Paragraph(f'{summary["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
+    _sda_table = Table(data=[[Paragraph(f'sDA: {summary["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
     table_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('ROUNDEDCORNERS', [10, 10, 10, 10]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
     ])
-    table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
-    table_style.add('BACKGROUND', (0, 1), (0, 1), get_sda_cell_color(summary["sda"]))
+    table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(summary["sda"]))
     _sda_table.setStyle(table_style)
-    # _ase_table = Table(data=[['Annual Sunlight Exposure'], [Paragraph(f'{values["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
-    # table_style = TableStyle([
-    #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-    #     ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-    #     ('ROUNDEDCORNERS', [10, 10, 10, 10]),
-    #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-    # ])
-    # table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
-    # table_style.add('BACKGROUND', (0, 1), (0, 1), get_ase_cell_color(values["ase"]))
+
     _ase_table = Table(data=[[Paragraph(f'ASE: {summary["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
     table_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -345,15 +405,6 @@ def create_pdf(
     _metric_table.setStyle(table_style)
     story.append(_metric_table)
 
-    # summary_story.append(
-    #     Paragraph(f'Spatial Daylight Autonomy: {summary["sda"]}%', style=styles['Normal'])
-    # )
-
-    # summary_story.append(
-    #     Paragraph(f'Annual Sunlight Exposure: {summary["ase"]}%', style=styles['Normal'])
-    # )
-    # story.extend(summary_story)
-
     story.append(Spacer(width=0*cm, height=0.5*cm))
 
     # Create content
@@ -362,7 +413,7 @@ def create_pdf(
         ]
     )
 
-    def table_from_summary_grid(summary_grid, grid_filter: list = None):
+    def table_from_summary_grid(summary_grid, grid_filter: list = None, add_total: bool = True):
         if grid_filter:
             summary_grid = {k: summary_grid[k] for k in grid_filter if k in summary_grid}
         df = pd.DataFrame.from_dict(summary_grid).transpose()
@@ -406,8 +457,17 @@ def create_pdf(
         if not all(n=='' for n in ase_notes):
             df['ASE Note'] = ase_notes
 
-        data = df.values.tolist()
-
+        #data = df.values.tolist()
+        if add_total:
+            total_row = [
+                Paragraph('Total'),
+                Paragraph(''),
+                Paragraph(''),
+                Paragraph(str(round(df['Floor area passing ASE'].sum(), 2))),
+                Paragraph(str(round(df['Floor area passing sDA'].sum(), 2))),
+                Paragraph(str(round(df['Total floor area'].sum(), 2))),
+                Paragraph('')
+            ]
         df = df.astype(str)
         table_data =  [tuple(df)] + list(df.itertuples(index=False, name=None))
 
@@ -434,6 +494,9 @@ def create_pdf(
                 else:
                     formatted_row.append(Paragraph(cell_value))
             formatted_table_data.append(formatted_row)
+
+        if add_total:
+            formatted_table_data.append(total_row)
 
         table = Table(formatted_table_data, colWidths='*', repeatRows=1, rowSplitRange=0, spaceBefore=5, spaceAfter=5)
         table.setStyle(table_style)
@@ -464,9 +527,11 @@ def create_pdf(
             rooms_by_story[room.story].append(room)
     for story_id, rooms in rooms_by_story.items():
         story.append(Paragraph(story_id, style=styles['h1']))
-        horiz_bound = [room.horizontal_boundary() for room in rooms]
-        rooms_min = Room._calculate_min(horiz_bound)
-        rooms_max = Room._calculate_max(horiz_bound)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        horiz_bounds = [room.horizontal_boundary() for room in rooms]
+        rooms_min = Room._calculate_min(horiz_bounds)
+        rooms_max = Room._calculate_max(horiz_bounds)
 
         _width = rooms_max.x - rooms_min.x
         _height = rooms_max.y - rooms_min.y
@@ -479,9 +544,18 @@ def create_pdf(
         hrs_above_drawing = Drawing(drawing_width, drawing_height)
         hrs_above_drawing_pf = Drawing(drawing_width, drawing_height)
 
+        floor_area = 0
+        floor_area_passing_sda = 0
+        floor_area_passing_ase = 0
+        floor_sensor_grids = []
         for room in rooms:
             for sensor_grid in sensor_grids.values():
                 if sensor_grid.room_identifier == room.identifier:
+                    floor_area += summary_grid[room.display_name]['total_floor_area']
+                    floor_area_passing_sda += summary_grid[room.display_name]['floor_area_passing_sda']
+                    floor_area_passing_ase += summary_grid[room.display_name]['floor_area_passing_ase']
+                    floor_sensor_grids.append(sensor_grid.full_identifier)
+
                     mesh = sensor_grid.mesh
                     faces = mesh.faces
                     faces_centroids = mesh.face_centroids
@@ -503,14 +577,14 @@ def create_pdf(
 
                         lb_color =  da_color_range.color(_da)
                         fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
-                        polygon = Polygon(points=points, fillColor=fillColor, strokeColor=fillColor, strokeWidth=0)
+                        polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
                         da_drawing.add(polygon)
 
                         if _da >= 50:
                             fillColor = colors.Color(0 / 255, 195 / 255, 0 / 255)
                         else:
-                            fillColor = colors.Color(155 / 255, 155 / 255, 155 / 255)
-                        polygon = Circle(
+                            fillColor = colors.Color(175 / 255, 175 / 255, 175 / 255)
+                        circle = Circle(
                             np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
                             np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
                             ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
@@ -518,22 +592,20 @@ def create_pdf(
                             strokeWidth=0,
                             strokeOpacity=0
                         )
-                        da_drawing_pf.add(polygon)
+                        da_drawing_pf.add(circle)
 
                         lb_color =  hrs_above_color_range.color(_hrs)
                         fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
-                        polygon = Circle(
-                            np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
-                            np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
-                            ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
+                        polygon = Polygon(
+                            points=points,
                             fillColor=fillColor,
                             strokeWidth=0,
-                            strokeOpacity=0
+                            strokeColor=fillColor
                         )
                         hrs_above_drawing.add(polygon)
 
                         if _hrs > 250:
-                            fillColor = colors.Color(155 / 255, 155 / 255, 155 / 255)
+                            fillColor = colors.Color(175 / 255, 175 / 255, 175 / 255)
                         else:
                             fillColor = colors.Color(0 / 255, 195 / 255, 0 / 255)
                         polygon = Circle(
@@ -581,54 +653,104 @@ def create_pdf(
                     hrs_above_drawing.add(line)
                     hrs_above_drawing_pf.add(line)
 
-        def create_north_arrow(north: float, radius: float) -> Group:
-            north_arrow = Group(
-                Polygon(points=[-radius*0.2, 0, radius*0.2, 0, 0, radius], fillColor=colors.black, strokeColor=colors.black, strokeWidth=0),
-                Circle(0, 0, radius, strokeWidth=radius*0.025, fillOpacity=0),
-                PolyLine([-radius, 0, radius, 0], strokeWidth=radius*0.025/2)
-            )
-            north_arrow.rotate(north)
-            return north_arrow
+        floor_sda = floor_area_passing_sda / floor_area * 100
+        floor_ase = floor_area_passing_ase / floor_area * 100
 
-        def draw_north_arrow(north: float, radius: float) -> Drawing:
-            north_arrow_drawing = Drawing(width=radius*2, height=radius*2)
-            group = create_north_arrow(north, radius)
-            for elem in group.contents:
-                north_arrow_drawing.add(elem)
-            north_arrow_drawing.translate(radius, radius)
-            return north_arrow_drawing
+        _sda_table = Table(data=[[Paragraph(f'sDA: {round(floor_sda, 2)}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ])
+        table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(floor_sda))
+        _sda_table.setStyle(table_style)
 
-        def translate_group_relative(group: Group, anchor_group: Group, anchor: str, padding: float):
-            anchor_bounds = anchor_group.getBounds()
-            group_bounds = group.getBounds()
-            if anchor == 'e':
-                new_x = anchor_bounds[2]
-                new_y = (anchor_bounds[1] + anchor_bounds[3]) / 2
-                old_y = (group_bounds[1] + group_bounds[3]) / 2
-                dx = new_x - group_bounds[0] + padding
-                dy = new_y - old_y
-                group.translate(dx, dy)
-            else:
-                raise NotImplementedError()
+        _ase_table = Table(data=[[Paragraph(f'ASE: {round(floor_ase, 2)}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ])
+        table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(floor_ase))
+        _ase_table.setStyle(table_style)
+        table_style = TableStyle([
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        _metric_table.setStyle(table_style)
+        story.append(_metric_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        def drawing_dimensions_from_bounds(drawing: Drawing):
-            """Set the width and height based on the boundaries of the contents."""
-            drawing_bounds = drawing.getBounds()
-            if drawing_bounds[0] != 0 or drawing_bounds[1] != 0:
-                dx = 0 - drawing_bounds[0]
-                dy = 0 - drawing_bounds[1]
-                drawing.translate(dx, dy)
-            drawing_bounds = drawing.getBounds()
-            drawing.width = abs(drawing_bounds[2] - drawing_bounds[0])
-            drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
+        table, ase_notes = table_from_summary_grid(summary_grid, grid_filter=floor_sensor_grids)
+        story.append(table)
+
+        if not all(n=='' for n in ase_notes):
+            ase_note = Paragraph('1) The Annual Sunlight Exposure is greater than '
+                                '10% for this space. Identify in writing how the '
+                                'space is designed to address glare.')
+            story.append(Spacer(width=0*cm, height=0.5*cm))
+            story.append(ase_note)
 
         north_arrow_drawing = draw_north_arrow(north=0, radius=10)
-        story.append(Paragraph('Daylight Autonomy', style=styles['h2']))
-        da_group = KeepTogether(flowables=[da_drawing, Spacer(width=0*cm, height=0.5*cm), north_arrow_drawing])
+        section_header = Paragraph('Daylight Autonomy', style=styles['h2'])
+
+        legend_north_drawing = Drawing(0, 0)
+        north_arrow_group = create_north_arrow(0, 10)
+        group_bounds = north_arrow_group.getBounds()
+        if group_bounds[0] < 0 or group_bounds[1] < 0:
+            dx = 0
+            dy = 0
+            if group_bounds[0] < 0:
+                dx = abs(group_bounds[0])
+            if group_bounds[1] < 0:
+                dy = abs(group_bounds[1])
+            north_arrow_group.translate(dx, dy)
+        legend_north_drawing.add(north_arrow_group)
+
+        legend_par = LegendParameters(min=0, max=100, segment_count=11, colors=Colorset.annual_comfort())
+        legend_par.vertical = False
+        legend_par.segment_height = 5
+        legend_par.segment_width = 20
+        legend_par.decimal_count = 0
+        legend = Legend([0, 100], legend_parameters=legend_par)
+
+        ddd = Drawing(0, 0)
+        gggg = Group()
+        segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
+        for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
+            points = []
+            stl_x, stl_y, stl_z = segment_text_location.o.to_array()
+            fillColor = colors.Color(segment_color.r / 255, segment_color.g / 255, segment_color.b / 255)
+            for vertex in face:
+                points.extend([vertex.x, vertex.y])
+            polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
+            gggg.add(polygon)
+            ddd.add(polygon)
+            string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
+            gggg.add(string)
+            ddd.add(string)
+        string = String(x=segment_min.x-5, y=0, text='Daylight Autonomy (300 lux) [%]',textAnchor='end', fontName='Helvetica', fontSize=5)
+        gggg.add(string)
+        ddd.add(string)
+        ddd_bounds = ddd.getBounds()
+        dx = abs(0 - ddd_bounds[0])
+        dy = abs(0 - ddd_bounds[1])
+        ddd.translate(dx, dy)
+        drawing_dimensions_from_bounds(ddd)
+
+        translate_group_relative(gggg, north_arrow_group, anchor='e', padding=5)
+        legend_north_drawing.add(gggg)
+        drawing_dimensions_from_bounds(legend_north_drawing)
+        da_group = KeepTogether(flowables=[section_header, da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        story.append(Paragraph('Daylight Autonomy | Pass / Fail', style=styles['h2']))
+        section_header = Paragraph('Daylight Autonomy | Pass / Fail', style=styles['h2'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -644,26 +766,75 @@ def create_pdf(
         legend_north_drawing.add(north_arrow_group)
 
         rectangles = Group(
-            Rect(-50, 0, 50, 5, fillColor=colors.Color(155 / 255, 155 / 255, 155 / 255), strokeWidth=0, strokeColor=colors.Color(155 / 255, 155 / 255, 155 / 255)),
+            Rect(-50, 0, 50, 5, fillColor=colors.Color(175 / 255, 175 / 255, 175 / 255), strokeWidth=0, strokeColor=colors.Color(155 / 255, 155 / 255, 155 / 255)),
             Rect(0, 0, 50, 5, fillColor=colors.Color(0 / 255, 195 / 255, 0 / 255), strokeWidth=0, strokeColor=colors.Color(0 / 255, 195 / 255, 0 / 255)),
-            String(x=0, y=-5*1.1, text='50%',textAnchor='middle', fontName='Helvetica', fontSize=5),
-            String(x=-50, y=-5*1.1, text='0%',textAnchor='start', fontName='Helvetica', fontSize=5),
-            String(x=50, y=-5*1.1, text='100%',textAnchor='end', fontName='Helvetica', fontSize=5),
-            String(x=-50*1.1, y=0, text='Daylight Autonomy (300 lux)',textAnchor='end', fontName='Helvetica', fontSize=5)
+            String(x=0, y=-5*1.1, text='50',textAnchor='middle', fontName='Helvetica', fontSize=5),
+            String(x=-50, y=-5*1.1, text='0',textAnchor='start', fontName='Helvetica', fontSize=5),
+            String(x=50, y=-5*1.1, text='100',textAnchor='end', fontName='Helvetica', fontSize=5),
+            String(x=-50-5, y=0, text='Daylight Autonomy (300 lux) [%]',textAnchor='end', fontName='Helvetica', fontSize=5)
         )
 
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        da_pf_group = KeepTogether(flowables=[da_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        da_pf_group = KeepTogether(flowables=[section_header, da_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        story.append(Paragraph('Direct Sunlight', style=styles['h2']))
-        story.append(hrs_above_drawing)
+        section_header = Paragraph('Direct Sunlight', style=styles['h2'])
+
+        legend_north_drawing = Drawing(0, 0)
+        north_arrow_group = create_north_arrow(0, 10)
+        group_bounds = north_arrow_group.getBounds()
+        if group_bounds[0] < 0 or group_bounds[1] < 0:
+            dx = 0
+            dy = 0
+            if group_bounds[0] < 0:
+                dx = abs(group_bounds[0])
+            if group_bounds[1] < 0:
+                dy = abs(group_bounds[1])
+            north_arrow_group.translate(dx, dy)
+        legend_north_drawing.add(north_arrow_group)
+
+        legend_par = LegendParameters(min=0, max=250, segment_count=11, colors=Colorset.original())
+        legend_par.vertical = False
+        legend_par.segment_height = 5
+        legend_par.segment_width = 20
+        legend_par.decimal_count = 0
+        legend = Legend([0, 250], legend_parameters=legend_par)
+        ddd = Drawing(0, 0)
+        gggg = Group()
+        segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
+        for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
+            points = []
+            stl_x, stl_y, stl_z = segment_text_location.o.to_array()
+            fillColor = colors.Color(segment_color.r / 255, segment_color.g / 255, segment_color.b / 255)
+            for vertex in face:
+                points.extend([vertex.x, vertex.y])
+            polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
+            gggg.add(polygon)
+            ddd.add(polygon)
+            string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
+            gggg.add(string)
+            ddd.add(string)
+        string = String(x=segment_min.x-5, y=0, text='Direct Sunlight (1000 lux) [hrs]',textAnchor='end', fontName='Helvetica', fontSize=5)
+        gggg.add(string)
+        ddd.add(string)
+        ddd_bounds = ddd.getBounds()
+        dx = abs(0 - ddd_bounds[0])
+        dy = abs(0 - ddd_bounds[1])
+        ddd.translate(dx, dy)
+        drawing_dimensions_from_bounds(ddd)
+
+        translate_group_relative(gggg, north_arrow_group, 'e', 5)
+        legend_north_drawing.add(gggg)
+        drawing_dimensions_from_bounds(legend_north_drawing)
+
+        hrs_above_group = KeepTogether(flowables=[section_header, hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        story.append(hrs_above_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        story.append(Paragraph('Direct Sunlight | Pass / Fail', style=styles['h2']))
+        section_header = Paragraph('Direct Sunlight | Pass / Fail', style=styles['h2'])
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
         group_bounds = north_arrow_group.getBounds()
@@ -679,16 +850,16 @@ def create_pdf(
 
         rectangles = Group(
             Rect(-50, 0, 50, 5, fillColor=colors.Color(0 / 255, 195 / 255, 0 / 255), strokeWidth=0, strokeColor=colors.Color(0 / 255, 195 / 255, 0 / 255)),
-            Rect(0, 0, 50, 5, fillColor=colors.Color(155 / 255, 155 / 255, 155 / 255), strokeWidth=0, strokeColor=colors.Color(155 / 255, 155 / 255, 155 / 255)),
-            String(x=0, y=-5*1.1, text='250 hrs',textAnchor='middle', fontName='Helvetica', fontSize=5),
-            String(x=-50, y=-5*1.1, text='0 hrs',textAnchor='start', fontName='Helvetica', fontSize=5),
-            String(x=-50*1.1, y=0, text='Direct Sunlight (1000 lux)',textAnchor='end', fontName='Helvetica', fontSize=5)
+            Rect(0, 0, 50, 5, fillColor=colors.Color(175 / 255, 175 / 255, 175 / 255), strokeWidth=0, strokeColor=colors.Color(155 / 255, 155 / 255, 155 / 255)),
+            String(x=0, y=-5*1.1, text='250',textAnchor='middle', fontName='Helvetica', fontSize=5),
+            String(x=-50, y=-5*1.1, text='0',textAnchor='start', fontName='Helvetica', fontSize=5),
+            String(x=-50-5, y=0, text='Direct Sunlight (1000 lux) [hrs]',textAnchor='end', fontName='Helvetica', fontSize=5)
         )
 
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        hrs_above_pf_group = KeepTogether(flowables=[hrs_above_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        hrs_above_pf_group = KeepTogether(flowables=[section_header, hrs_above_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(hrs_above_pf_group)
         story.append(PageBreak())
 
@@ -696,15 +867,14 @@ def create_pdf(
         story.append(Paragraph(grid_id, style=styles['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        _sda_table = Table(data=[['Spatial Daylight Autonomy'], [Paragraph(f'{values["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[None, 16*mm])
+        _sda_table = Table(data=[[Paragraph(f'sDA: {values["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('ROUNDEDCORNERS', [10, 10, 10, 10]),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ])
-        table_style.add('BACKGROUND', (0, 0), (0, 0), colors.Color(220 / 255, 220 / 255, 220 / 255, 0.3))
-        table_style.add('BACKGROUND', (0, 1), (0, 1), get_sda_cell_color(values["sda"]))
+        table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(values["sda"]))
         _sda_table.setStyle(table_style)
 
         _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
@@ -749,6 +919,7 @@ def create_pdf(
         hrs_above = np.loadtxt(Path(f'app/sample/leed-summary/results/ase_hours_above/{grid_id}.res'))
         da_color_range = ColorRange(colors=Colorset.annual_comfort(), domain=[0, 100])
         hrs_above_color_range = ColorRange(colors=Colorset.original(), domain=[0, 250])
+
         for face, face_centroid, _da, _hrs in zip(faces, faces_centroids, da, hrs_above):
             vertices = [mesh.vertices[i] for i in face]
             points = []
@@ -767,14 +938,7 @@ def create_pdf(
 
             lb_color =  hrs_above_color_range.color(_hrs)
             fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
-            polygon = Circle(
-                np.interp(face_centroid.x, [room_min.x, room_max.x], [0, drawing_width]),
-                np.interp(face_centroid.y, [room_min.y, room_max.y], [0, drawing_height]),
-                ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
-                fillColor=fillColor,
-                strokeWidth=0,
-                strokeOpacity=0
-            )
+            polygon = Polygon(points=points, fillColor=fillColor, strokeColor=fillColor, strokeWidth=0)
             hrs_above_drawing.add(polygon)
         
         points = []
@@ -786,9 +950,26 @@ def create_pdf(
                     np.interp(vertex.y, [room_min.y, room_max.y], [0, drawing_height])
                 ]
             )
-        polygon = Polygon(points=points, strokeWidth=0.5, fillOpacity=0)
+        polygon = Polygon(points=points, strokeWidth=0.2, fillOpacity=0)
         hrs_above_drawing.add(polygon)
         da_drawing.add(polygon)
+
+        room = hb_model.rooms_by_identifier([sensor_grid.room_identifier])[0]
+        # draw vertical apertures
+        for aperture in room.apertures:
+            if aperture.normal.z == 0:
+                aperture_min = aperture.geometry.lower_left_corner
+                aperture_max = aperture.geometry.lower_right_corner
+                strokeColor = colors.Color(95 / 255, 195 / 255, 255 / 255)
+                line = Line(np.interp(aperture_min.x, [room_min.x, room_max.x], [0, drawing_width]),
+                            np.interp(aperture_min.y, [room_min.y, room_max.y], [0, drawing_height]),
+                            np.interp(aperture_max.x, [room_min.x, room_max.x], [0, drawing_width]),
+                            np.interp(aperture_max.y, [room_min.y, room_max.y], [0, drawing_height]),
+                            strokeColor=strokeColor,
+                            strokeWidth=0.5
+                            )
+                da_drawing.add(line)
+                hrs_above_drawing.add(line)
 
         _da_heatmap_table = Table(data=[[da_drawing]])
         table_style = TableStyle([
@@ -815,40 +996,147 @@ def create_pdf(
         story.append(_heatmap_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        if grid_id == 'Room_2':
-            table_style = TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-                ('TOPPADDING', (0, 0), (-1, -1), 0),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-            ])
-            _scale_table = Table(
-                data=[
-                    [
-                        da_drawing,
-                        scale_drawing(da_drawing, 200 / 300, 200 / 300),
-                        scale_drawing(da_drawing, 200 / 400, 200 / 400),
-                        scale_drawing(da_drawing, 200 / 500, 200 / 500),
-                        scale_drawing(da_drawing, 200 / 1000, 200 / 1000),
-                        scale_drawing(da_drawing, 200 / 2000, 200 / 2000)
-                    ],
-                    [
-                        '1:200',
-                        '1:300',
-                        '1:400',
-                        '1:500',
-                        '1:1000',
-                        '1:2000'
-                    ]
-                    ],
-                colWidths='*')
-            _scale_table.setStyle(table_style)
-            story.append(_scale_table)
-            story.append(Spacer(width=0*cm, height=0.5*cm))
+        legend_da = Drawing(0, 0)
+        north_arrow_group = create_north_arrow(0, 10)
+        group_bounds = north_arrow_group.getBounds()
+        if group_bounds[0] < 0 or group_bounds[1] < 0:
+            dx = 0
+            dy = 0
+            if group_bounds[0] < 0:
+                dx = abs(group_bounds[0])
+            if group_bounds[1] < 0:
+                dy = abs(group_bounds[1])
+            north_arrow_group.translate(dx, dy)
+        legend_da.add(north_arrow_group)
 
-        table, ase_notes = table_from_summary_grid(summary_grid, [grid_id])
+        legend_par = LegendParameters(min=0, max=100, segment_count=11, colors=Colorset.annual_comfort())
+        legend_par.vertical = False
+        legend_par.segment_height = 5
+        legend_par.segment_width = 10
+        legend_par.decimal_count = 0
+        legend = Legend([0, 100], legend_parameters=legend_par)
+
+        ddd = Drawing(0, 0)
+        gggg = Group()
+        segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
+        for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
+            points = []
+            stl_x, stl_y, stl_z = segment_text_location.o.to_array()
+            fillColor = colors.Color(segment_color.r / 255, segment_color.g / 255, segment_color.b / 255)
+            for vertex in face:
+                points.extend([vertex.x, vertex.y])
+            polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
+            gggg.add(polygon)
+            ddd.add(polygon)
+            string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
+            gggg.add(string)
+            ddd.add(string)
+        string = String(x=segment_min.x-5, y=0, text='Daylight Autonomy (300 lux) [%]',textAnchor='end', fontName='Helvetica', fontSize=5)
+        gggg.add(string)
+        ddd.add(string)
+        ddd_bounds = ddd.getBounds()
+        dx = abs(0 - ddd_bounds[0])
+        dy = abs(0 - ddd_bounds[1])
+        ddd.translate(dx, dy)
+        drawing_dimensions_from_bounds(ddd)
+
+        translate_group_relative(gggg, north_arrow_group, anchor='e', padding=5)
+        legend_da.add(gggg)
+        drawing_dimensions_from_bounds(legend_da)
+
+        legend_hrs_above = Drawing(0, 0)
+        north_arrow_group = create_north_arrow(0, 10)
+        group_bounds = north_arrow_group.getBounds()
+        if group_bounds[0] < 0 or group_bounds[1] < 0:
+            dx = 0
+            dy = 0
+            if group_bounds[0] < 0:
+                dx = abs(group_bounds[0])
+            if group_bounds[1] < 0:
+                dy = abs(group_bounds[1])
+            north_arrow_group.translate(dx, dy)
+        legend_hrs_above.add(north_arrow_group)
+
+        legend_par = LegendParameters(min=0, max=250, segment_count=11, colors=Colorset.original())
+        legend_par.vertical = False
+        legend_par.segment_height = 5
+        legend_par.segment_width = 10
+        legend_par.decimal_count = 0
+        legend = Legend([0, 250], legend_parameters=legend_par)
+        ddd = Drawing(0, 0)
+        gggg = Group()
+        segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
+        for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
+            points = []
+            stl_x, stl_y, stl_z = segment_text_location.o.to_array()
+            fillColor = colors.Color(segment_color.r / 255, segment_color.g / 255, segment_color.b / 255)
+            for vertex in face:
+                points.extend([vertex.x, vertex.y])
+            polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
+            gggg.add(polygon)
+            ddd.add(polygon)
+            string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
+            gggg.add(string)
+            ddd.add(string)
+        string = String(x=segment_min.x-5, y=0, text='Direct Sunlight (1000 lux) [hrs]',textAnchor='end', fontName='Helvetica', fontSize=5)
+        gggg.add(string)
+        ddd.add(string)
+        ddd_bounds = ddd.getBounds()
+        dx = abs(0 - ddd_bounds[0])
+        dy = abs(0 - ddd_bounds[1])
+        ddd.translate(dx, dy)
+        drawing_dimensions_from_bounds(ddd)
+
+        translate_group_relative(gggg, north_arrow_group, 'e', 5)
+        legend_hrs_above.add(gggg)
+        drawing_dimensions_from_bounds(legend_hrs_above)
+
+        legends_table = Table(data=[[scale_drawing_to_width(legend_da, doc.width*0.45), '', scale_drawing_to_width(legend_hrs_above, doc.width*0.45)]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        
+        table_style = TableStyle([
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        legends_table.setStyle(table_style)
+        story.append(legends_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        # if grid_id == 'Room_2':
+        #     table_style = TableStyle([
+        #         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        #         ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        #         ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        #         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        #         ('TOPPADDING', (0, 0), (-1, -1), 0),
+        #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        #     ])
+        #     _scale_table = Table(
+        #         data=[
+        #             [
+        #                 da_drawing,
+        #                 scale_drawing(da_drawing, 200 / 300, 200 / 300),
+        #                 scale_drawing(da_drawing, 200 / 400, 200 / 400),
+        #                 scale_drawing(da_drawing, 200 / 500, 200 / 500),
+        #                 scale_drawing(da_drawing, 200 / 1000, 200 / 1000),
+        #                 scale_drawing(da_drawing, 200 / 2000, 200 / 2000)
+        #             ],
+        #             [
+        #                 '1:200',
+        #                 '1:300',
+        #                 '1:400',
+        #                 '1:500',
+        #                 '1:1000',
+        #                 '1:2000'
+        #             ]
+        #             ],
+        #         colWidths='*')
+        #     _scale_table.setStyle(table_style)
+        #     story.append(_scale_table)
+        #     story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        table, ase_notes = table_from_summary_grid(summary_grid, [grid_id], add_total=False)
         
         story.append(table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -921,15 +1209,14 @@ def create_pdf(
         #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
         # story.append(CondPageBreak())
-        break
 
     pollination_image = 'assets/images/pollination.png'
     # Build and save the PDF
     doc.build(
         story,
-        onFirstPage=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
+        #onFirstPage=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
         onLaterPages=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
-        canvasmaker=NumberedPageCanvas
+        canvasmaker=partial(NumberedPageCanvas, skip_pages=1, start_on_skip_pages=True)
     )
 
 
