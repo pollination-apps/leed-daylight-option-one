@@ -148,7 +148,6 @@ class PdfImage(Flowable):
             filename_or_object.seek(0)
         self.page = PdfReader(filename_or_object, decompress=False).pages[0]
         self.xobj = pagexobj(self.page)
-
         self.imageWidth = width
         self.imageHeight = height
         x1, y1, x2, y2 = self.xobj.BBox
@@ -189,6 +188,8 @@ class PdfImage(Flowable):
         """
         translates Bounding Box and scales the given canvas
         """
+        x = 0 # override to avoid margins of frame
+        y = 0 # override to avoid margins of frame
         if _sW > 0 and hasattr(self, 'hAlign'):
             a = self.hAlign
             if a in ('CENTER', 'CENTRE', TA_CENTER):
@@ -681,7 +682,9 @@ def create_pdf(
             ('TOPPADDING', (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
         ])
-        _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        column_widths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
+        colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+        _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=colWidths)
         _metric_table.setStyle(table_style)
         story.append(_metric_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -746,6 +749,7 @@ def create_pdf(
         translate_group_relative(gggg, north_arrow_group, anchor='e', padding=5)
         legend_north_drawing.add(gggg)
         drawing_dimensions_from_bounds(legend_north_drawing)
+        da_drawing = scale_drawing_to_width(da_drawing, doc.width-12)
         da_group = KeepTogether(flowables=[section_header, da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -777,6 +781,7 @@ def create_pdf(
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
+        da_drawing_pf = scale_drawing_to_width(da_drawing_pf, doc.width-12)
         da_pf_group = KeepTogether(flowables=[section_header, da_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -829,7 +834,7 @@ def create_pdf(
         translate_group_relative(gggg, north_arrow_group, 'e', 5)
         legend_north_drawing.add(gggg)
         drawing_dimensions_from_bounds(legend_north_drawing)
-
+        hrs_above_drawing = scale_drawing_to_width(hrs_above_drawing, doc.width-12)
         hrs_above_group = KeepTogether(flowables=[section_header, hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(hrs_above_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -859,10 +864,12 @@ def create_pdf(
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
+        hrs_above_drawing_pf = scale_drawing_to_width(hrs_above_drawing_pf, doc.width-12)
         hrs_above_pf_group = KeepTogether(flowables=[section_header, hrs_above_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(hrs_above_pf_group)
         story.append(PageBreak())
 
+    # SUMMARY OF EACH GRID
     for grid_id, values in summary_grid.items():
         story.append(Paragraph(grid_id, style=styles['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -1187,13 +1194,27 @@ def create_pdf(
             # get figure
             figure = figure_aperture_group_schedule(aperture_group, datacollection)
             fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
-            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*(2/3), height=None, keep_ratio=True)
+            column_widths = [doc.width*(1/3), doc.width*(2/3)]
+            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*(2/3)-12/len(column_widths), height=None, keep_ratio=True)
             pdf_table = Table([[pdf_image]])
-            table = Table([[shading_table, pdf_table]], colWidths=[doc.width*(1/3), doc.width*(2/3)])
+            pdf_table.setStyle(
+                TableStyle([
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+                ])
+            )
+            colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+            table = Table([[shading_table, pdf_table]], colWidths=colWidths)
             table.setStyle(
                 TableStyle([
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
                 ])
             )
             story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -1209,6 +1230,7 @@ def create_pdf(
         #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
         # story.append(CondPageBreak())
+        break
 
     pollination_image = 'assets/images/pollination.png'
     # Build and save the PDF
