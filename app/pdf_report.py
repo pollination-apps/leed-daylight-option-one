@@ -23,6 +23,7 @@ from reportlab.graphics.widgets.adjustableArrow import AdjustableArrow
 from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Paragraph, \
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
     Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether
+from reportlab.platypus.tableofcontents import TableOfContents
 from svglib.svglib import svg2rlg
 
 from ladybug.analysisperiod import AnalysisPeriod
@@ -84,7 +85,7 @@ class NumberedPageCanvas(canvas.Canvas):
                 self.drawRightString(195 * mm, 15 * mm, page)
 
 
-def _header(canvas, doc, content, logo):
+def _header(canvas, doc, content, logo: None):
     canvas.saveState()
     w, h = content.wrap(doc.width, doc.topMargin)
     content_width = \
@@ -94,14 +95,15 @@ def _header(canvas, doc, content, logo):
         doc.leftMargin+doc.width-content_width,
         doc.bottomMargin+doc.height+doc.topMargin-15*mm+1*mm
     )
-    canvas.drawImage(
-        logo, x=doc.leftMargin,
-        y=doc.bottomMargin+doc.height+doc.topMargin-15*mm+1*mm,
-        height=5*mm,
-        preserveAspectRatio=True,
-        anchor='w',
-        mask='auto'
-    )
+    if logo:
+        canvas.drawImage(
+            logo, x=doc.leftMargin,
+            y=doc.bottomMargin+doc.height+doc.topMargin-15*mm+1*mm,
+            height=5*mm,
+            preserveAspectRatio=True,
+            anchor='w',
+            mask='auto'
+        )
     canvas.setLineWidth(0.2)
     canvas.line(
         doc.leftMargin,
@@ -277,6 +279,27 @@ def drawing_dimensions_from_bounds(drawing: Drawing):
     drawing.width = abs(drawing_bounds[2] - drawing_bounds[0])
     drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
 
+class MyDocTemplate(BaseDocTemplate):
+
+    def __init__(self, filename, **kw):
+        self.allowSplitting = 0
+        self.skip_pages = kw.pop('skip_pages', 0)
+        self.start_on_skip_pages = kw.pop('start_on_skip_pages', None)
+        BaseDocTemplate.__init__(self, filename, **kw)
+
+    def afterFlowable(self, flowable):
+        "Registers TOC entries."
+        if isinstance(flowable, Paragraph):
+            text = flowable.getPlainText()
+            style = flowable.style.name
+            pageNum = self.page - self.skip_pages
+            if style == 'Heading1':
+                self.notify('TOCEntry', (0, text, pageNum))
+            if style == 'Heading2':
+                key = 'h2-%s' % self.seq.nextf('heading2')
+                self.canv.bookmarkPage(key)
+                self.notify('TOCEntry', (1, text, pageNum))
+
 
 def create_pdf(
         output_file, pagesize: tuple = A4, left_margin: float = 1.5*cm,
@@ -284,12 +307,12 @@ def create_pdf(
         bottom_margin: float = 2*cm,
     ):
 
-    pdf_canvas = canvas.Canvas(output_file, pagesize=pagesize)
     # Create a PDF document
-    doc = SimpleDocTemplate(
+    doc = MyDocTemplate(
         output_file, pagesize=pagesize, leftMargin=left_margin,
         rightMargin=right_margin, topMargin=top_margin,
-        bottomMargin=bottom_margin, showBoundary=False
+        bottomMargin=bottom_margin, showBoundary=False, skip_pages=2,
+        start_on_skip_pages=True
     )
 
     # Set up styles
@@ -304,7 +327,6 @@ def create_pdf(
                               leading=12,
                               fontName=_baseFontNameB)
     )
-
     styles.add(ParagraphStyle(name='Normal_CENTER',
                               parent=styles['Normal'],
                               alignment=TA_CENTER,
@@ -317,36 +339,53 @@ def create_pdf(
                               fontSize=10,
                               leading=12)
     )
-    new_style = styles['h2'].clone('h2_CENTER')
-    new_style.alignment = TA_CENTER
-    styles.add(new_style)
+    styles.add(ParagraphStyle(name='Heading1_CENTER',
+                              parent=styles['Heading1'],
+                              alignment=TA_CENTER),
+                alias='h1_c')
+    styles.add(ParagraphStyle(name='Heading2_CENTER',
+                              parent=styles['Heading2'],
+                              alignment=TA_CENTER),
+                alias='h2_c')
 
-    title_frame = Frame(doc.leftMargin, doc.bottomMargin + doc.height - 4 * cm, doc.width, 4 * cm, showBoundary=1, id='title-frame')
-    extra_frame = Frame(doc.leftMargin, doc.bottomMargin + doc.height - 9 * cm, doc.width, 4 * cm, showBoundary=1, id='extra-frame')
-    table_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, 12 * cm, showBoundary=1, id='table-frame')
+    title_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, showBoundary=0, id='title-frame')
 
-    header_content = Paragraph("This is a header. testing testing testing!", styles['Normal'])
-    footer_content = Paragraph("LEED Daylight Option I", styles['Normal'])
-    title_page_template = PageTemplate(id='title-page', onPage=partial(_header, content=header_content), frames=[title_frame], pagesize=pagesize)
-    #doc.addPageTemplates(title_page_template)
-    #grid_page_template = PageTemplate(id='grid-page', onPage=partial(_header, content=header_content), pagesize=pagesize)
-    #doc.addPageTemplates(grid_page_template)
-
-    title_style = styles['Title']
+    header_content = Paragraph('', styles['Normal'])
+    footer_content = Paragraph('LEED Daylight Option I', styles['Normal'])
+    pollination_image = 'assets/images/pollination.png'
+    title_page_template = PageTemplate(id='title-page', frames=[title_frame], pagesize=pagesize)
+    base_template = PageTemplate(
+        'base',
+        [Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='base-frame',
+               leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0)],
+        onPage=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image)
+    )
+    doc.addPageTemplates(title_page_template)
+    doc.addPageTemplates(base_template)
 
     story = []
-    #story.append(NextPageTemplate('title-page'))
-    front_page_table = Table(data=
+    front_page_table = Table(
         [
-            [Paragraph("LEED Daylight Option I Report", styles['h2'])],
-            [Paragraph('Project: My Project')],
-            [Paragraph('Prepared by: Mikkel Pedersen')],
-            [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}')]
+            [Paragraph('LEED Daylight Option I Report', styles['h1_c'])],
+            [Paragraph('Project: My Project', styles['h2_c'])],
+            [],
+            [Paragraph('Prepared by: Mikkel Pedersen', styles['Normal_CENTER'])],
+            [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}', styles['Normal_CENTER'])]
         ]
     )
-    story.append(front_page_table)
+    host_table = Table(
+        [[front_page_table]], colWidths=[doc.width]
+    )
+    story.append(Spacer(width=0*cm, height=doc.height/2-host_table.wrap(0, 0)[1]))
+    story.append(host_table)
+    story.append(NextPageTemplate('base'))
     story.append(PageBreak())
-    document_title = Paragraph("LEED Daylight Option I", title_style)
+
+    toc = TableOfContents()
+    story.append(toc)
+    story.append(PageBreak())
+
+    document_title = Paragraph("Summary", styles['h1'])
     story.append(document_title)
 
     if summary['credits'] > 0:
@@ -377,7 +416,7 @@ def create_pdf(
         else:
             return colors.Color(0, 255 / 255, 0, 0.3)
 
-    _sda_table = Table(data=[[Paragraph(f'sDA: {summary["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+    _sda_table = Table(data=[[Paragraph(f'sDA: {summary["sda"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
     table_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -387,7 +426,7 @@ def create_pdf(
     table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(summary["sda"]))
     _sda_table.setStyle(table_style)
 
-    _ase_table = Table(data=[[Paragraph(f'ASE: {summary["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+    _ase_table = Table(data=[[Paragraph(f'ASE: {summary["ase"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
     table_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -537,7 +576,7 @@ def create_pdf(
         _width = rooms_max.x - rooms_min.x
         _height = rooms_max.y - rooms_min.y
         _ratio = _width / _height
-        drawing_scale = 500
+        drawing_scale = 200
         drawing_width = (_width / drawing_scale) * 1000 * mm
         drawing_height = drawing_width / _ratio
         da_drawing = Drawing(drawing_width, drawing_height)
@@ -657,7 +696,7 @@ def create_pdf(
         floor_sda = floor_area_passing_sda / floor_area * 100
         floor_ase = floor_area_passing_ase / floor_area * 100
 
-        _sda_table = Table(data=[[Paragraph(f'sDA: {round(floor_sda, 2)}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        _sda_table = Table(data=[[Paragraph(f'sDA: {round(floor_sda, 2)}%', style=styles['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -667,7 +706,7 @@ def create_pdf(
         table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(floor_sda))
         _sda_table.setStyle(table_style)
 
-        _ase_table = Table(data=[[Paragraph(f'ASE: {round(floor_ase, 2)}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        _ase_table = Table(data=[[Paragraph(f'ASE: {round(floor_ase, 2)}%', style=styles['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -682,8 +721,9 @@ def create_pdf(
             ('TOPPADDING', (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
         ])
-        column_widths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
-        colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+        # column_widths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
+        # colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+        colWidths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
         _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=colWidths)
         _metric_table.setStyle(table_style)
         story.append(_metric_table)
@@ -749,7 +789,7 @@ def create_pdf(
         translate_group_relative(gggg, north_arrow_group, anchor='e', padding=5)
         legend_north_drawing.add(gggg)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        da_drawing = scale_drawing_to_width(da_drawing, doc.width-12)
+        da_drawing = scale_drawing_to_width(da_drawing, doc.width)
         da_group = KeepTogether(flowables=[section_header, da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -781,7 +821,7 @@ def create_pdf(
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        da_drawing_pf = scale_drawing_to_width(da_drawing_pf, doc.width-12)
+        da_drawing_pf = scale_drawing_to_width(da_drawing_pf, doc.width)
         da_pf_group = KeepTogether(flowables=[section_header, da_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -834,7 +874,7 @@ def create_pdf(
         translate_group_relative(gggg, north_arrow_group, 'e', 5)
         legend_north_drawing.add(gggg)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        hrs_above_drawing = scale_drawing_to_width(hrs_above_drawing, doc.width-12)
+        hrs_above_drawing = scale_drawing_to_width(hrs_above_drawing, doc.width)
         hrs_above_group = KeepTogether(flowables=[section_header, hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(hrs_above_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -864,7 +904,7 @@ def create_pdf(
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        hrs_above_drawing_pf = scale_drawing_to_width(hrs_above_drawing_pf, doc.width-12)
+        hrs_above_drawing_pf = scale_drawing_to_width(hrs_above_drawing_pf, doc.width)
         hrs_above_pf_group = KeepTogether(flowables=[section_header, hrs_above_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(hrs_above_pf_group)
         story.append(PageBreak())
@@ -874,7 +914,7 @@ def create_pdf(
         story.append(Paragraph(grid_id, style=styles['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        _sda_table = Table(data=[[Paragraph(f'sDA: {values["sda"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        _sda_table = Table(data=[[Paragraph(f'sDA: {values["sda"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -884,7 +924,7 @@ def create_pdf(
         table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(values["sda"]))
         _sda_table.setStyle(table_style)
 
-        _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=styles['h2_CENTER'])]], rowHeights=[16*mm])
+        _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -1194,8 +1234,8 @@ def create_pdf(
             # get figure
             figure = figure_aperture_group_schedule(aperture_group, datacollection)
             fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
-            column_widths = [doc.width*(1/3), doc.width*(2/3)]
-            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*(2/3)-12/len(column_widths), height=None, keep_ratio=True)
+            colWidths = [doc.width*(1/3), doc.width*(2/3)]
+            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*(2/3), height=None, keep_ratio=True)
             pdf_table = Table([[pdf_image]])
             pdf_table.setStyle(
                 TableStyle([
@@ -1205,7 +1245,7 @@ def create_pdf(
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
                 ])
             )
-            colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+            #colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
             table = Table([[shading_table, pdf_table]], colWidths=colWidths)
             table.setStyle(
                 TableStyle([
@@ -1232,13 +1272,12 @@ def create_pdf(
         # story.append(CondPageBreak())
         break
 
-    pollination_image = 'assets/images/pollination.png'
     # Build and save the PDF
-    doc.build(
+    doc.multiBuild(
         story,
         #onFirstPage=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
-        onLaterPages=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
-        canvasmaker=partial(NumberedPageCanvas, skip_pages=1, start_on_skip_pages=True)
+        #onLaterPages=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
+        canvasmaker=partial(NumberedPageCanvas, skip_pages=doc.skip_pages, start_on_skip_pages=doc.start_on_skip_pages)
     )
 
 
