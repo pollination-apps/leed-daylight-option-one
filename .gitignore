@@ -16,3 +16,4 @@ venv
 /.cache
 /.vscode
 /app/data
+/app/temp

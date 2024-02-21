@@ -5,7 +5,6 @@ import json
 import numpy as np
 from io import BytesIO
 import datetime
-from collections import OrderedDict
 from pdfrw import PdfReader, PdfDict
 from pdfrw.buildxobj import pagexobj
 from pdfrw.toreportlab import makerl
@@ -34,10 +33,6 @@ from honeybee.model import Model, Room
 
 from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
-
-
-folder, vtjks_file, summary, summary_grid, states_schedule, \
-    states_schedule_err, hb_model = load_from_folder(Path('./app/sample'))
 
 
 class NumberedPageCanvas(canvas.Canvas):
@@ -294,24 +289,28 @@ class MyDocTemplate(BaseDocTemplate):
             style = flowable.style.name
             pageNum = self.page - self.skip_pages
             if style == 'Heading1':
-                self.notify('TOCEntry', (0, text, pageNum))
-            if style == 'Heading2':
-                key = 'h2-%s' % self.seq.nextf('heading2')
+                key = 'h1-%s' % self.seq.nextf('Heading1')
                 self.canv.bookmarkPage(key)
-                self.notify('TOCEntry', (1, text, pageNum))
+                self.notify('TOCEntry', (0, text, pageNum))
+            # if style == 'Heading2':
+            #     key = 'h2-%s' % self.seq.nextf('heading2')
+            #     self.canv.bookmarkPage(key)
+            #     self.notify('TOCEntry', (1, text, pageNum))
 
 
 def create_pdf(
-        output_file, pagesize: tuple = A4, left_margin: float = 1.5*cm,
+        output_file: Path, run_folder: Path, report_data: dict, pagesize: tuple = A4, left_margin: float = 1.5*cm,
         right_margin: float = 1.5*cm, top_margin: float = 2*cm,
         bottom_margin: float = 2*cm,
     ):
-
+    output_file = str(output_file)
+    folder, vtjks_file, summary, summary_grid, states_schedule, \
+        states_schedule_err, hb_model = load_from_folder(run_folder)
     # Create a PDF document
     doc = MyDocTemplate(
         output_file, pagesize=pagesize, leftMargin=left_margin,
         rightMargin=right_margin, topMargin=top_margin,
-        bottomMargin=bottom_margin, showBoundary=False, skip_pages=2,
+        bottomMargin=bottom_margin, showBoundary=False, skip_pages=1,
         start_on_skip_pages=True
     )
 
@@ -367,9 +366,9 @@ def create_pdf(
     front_page_table = Table(
         [
             [Paragraph('LEED Daylight Option I Report', styles['h1_c'])],
-            [Paragraph('Project: My Project', styles['h2_c'])],
+            [Paragraph(f'Project: {report_data["project"]}', styles['h2_c'])],
             [],
-            [Paragraph('Prepared by: Mikkel Pedersen', styles['Normal_CENTER'])],
+            [Paragraph(f'Prepared by: {report_data["prepared_by"]}', styles['Normal_CENTER'])],
             [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}', styles['Normal_CENTER'])]
         ]
     )
@@ -382,6 +381,7 @@ def create_pdf(
     story.append(PageBreak())
 
     toc = TableOfContents()
+    toc.dotsMinLevel = 0
     story.append(toc)
     story.append(PageBreak())
 
@@ -390,13 +390,17 @@ def create_pdf(
 
     if summary['credits'] > 0:
         story.append(
-            Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h1'].clone(name='h1_GREEN', textColor='green'))
+            Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h2'].clone(name='h2_GREEN', textColor='green'))
         )
     else:
         story.append(
-            Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h1'])
+            Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h2'].clone(name='h2_BLACK', textColor='black'))
         )
     story.append(Spacer(width=0*cm, height=0.5*cm))
+
+    if 'note' in summary:
+        story.append(Paragraph(summary['note'], style=styles['BodyText']))
+        story.append(Spacer(width=0*cm, height=0.5*cm))
 
     def get_sda_cell_color(val: float):
         val = float(val)
@@ -600,9 +604,9 @@ def create_pdf(
                     faces = mesh.faces
                     faces_centroids = mesh.face_centroids
 
-                    da = np.loadtxt(Path(f'app/sample/leed-summary/results/da/{sensor_grid.full_identifier}.da'))
+                    da = np.loadtxt(run_folder.joinpath('leed-summary', 'results', 'da', f'{sensor_grid.full_identifier}.da'))
                     da_color_range = ColorRange(colors=Colorset.annual_comfort(), domain=[0, 100])
-                    hrs_above = np.loadtxt(Path(f'app/sample/leed-summary/results/ase_hours_above/{sensor_grid.full_identifier}.res'))
+                    hrs_above = np.loadtxt(run_folder.joinpath('leed-summary', 'results', 'ase_hours_above', f'{sensor_grid.full_identifier}.res'))
                     hrs_above_color_range = ColorRange(colors=Colorset.original(), domain=[0, 250])
                     for face, face_centroid, _da, _hrs in zip(faces, faces_centroids, da, hrs_above):
                         vertices = [mesh.vertices[i] for i in face]
@@ -961,9 +965,9 @@ def create_pdf(
         drawing_width = (_width / drawing_scale) * 1000 * mm
         drawing_height = drawing_width / _ratio
         da_drawing = Drawing(drawing_width, drawing_height)
-        da = np.loadtxt(Path(f'app/sample/leed-summary/results/da/{grid_id}.da'))
+        da = np.loadtxt(run_folder.joinpath('leed-summary', 'results', 'da', f'{grid_id}.da'))
         hrs_above_drawing = Drawing(drawing_width, drawing_height)
-        hrs_above = np.loadtxt(Path(f'app/sample/leed-summary/results/ase_hours_above/{grid_id}.res'))
+        hrs_above = np.loadtxt(run_folder.joinpath('leed-summary', 'results', 'ase_hours_above', f'{grid_id}.res'))
         da_color_range = ColorRange(colors=Colorset.annual_comfort(), domain=[0, 100])
         hrs_above_color_range = ColorRange(colors=Colorset.original(), domain=[0, 250])
 
@@ -1269,8 +1273,6 @@ def create_pdf(
 
         #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
-        # story.append(CondPageBreak())
-        break
 
     # Build and save the PDF
     doc.multiBuild(
@@ -1279,9 +1281,3 @@ def create_pdf(
         #onLaterPages=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
         canvasmaker=partial(NumberedPageCanvas, skip_pages=doc.skip_pages, start_on_skip_pages=doc.start_on_skip_pages)
     )
-
-
-if __name__ == "__main__":
-    output_file = "sample.pdf"
-    create_pdf(output_file)
-    print(f"PDF generated successfully: {output_file}")

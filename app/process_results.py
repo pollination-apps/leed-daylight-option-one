@@ -9,7 +9,7 @@ from ladybug.datacollection import HourlyContinuousCollection
 from on_change import (radio_show_all_grids, radio_show_all,
     multiselect_grids, multiselect_aperture_groups, radio_show_all_ase,
     multiselect_ase, legend_min_on_change, legend_max_on_change)
-from plot import figure_grids, figure_aperture_group_schedule, figure_ase
+from plot import figure_grids, figure_aperture_group_schedule, figure_ase, get_figure_config
 
 UNITS_AREA = {
     'Meters': 'm',
@@ -283,7 +283,8 @@ def process_states_schedule(states_schedule: dict):
     for aperture_group in st.session_state['select_aperture_groups']:
         datacollection = \
             HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
-        figure_aperture_group_schedule(aperture_group, datacollection)
+        fig = figure_aperture_group_schedule(aperture_group, datacollection)
+        st.plotly_chart(fig, use_container_width=True, config=get_figure_config(aperture_group))
 
 
 def process_ase(folder: Path):
