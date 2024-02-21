@@ -158,8 +158,6 @@ def figure_aperture_group_schedule(aperture_group: str,
     fig.update_xaxes(showline=True, linewidth=1, linecolor="black", mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, linecolor="black", mirror=True)
 
-    st.plotly_chart(fig, use_container_width=True, config=get_figure_config(aperture_group))
-
     return fig
 
 

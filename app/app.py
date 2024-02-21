@@ -9,6 +9,7 @@ from run import check_run_recipe
 from results import load_results, load_from_folder
 from process_results import (process_summary, show_errors, process_space,
     process_states_schedule, process_ase)
+from report import export_report
 
 
 st.set_page_config(
@@ -21,13 +22,13 @@ def main():
     st.header('LEED Daylight Option I')
     initialize()
 
-    study_tab, summary_tab, states_schedule_tab, dir_ill_tab, visualization_tab = \
+    study_tab, summary_tab, states_schedule_tab, dir_ill_tab, visualization_tab, report_tab = \
         st.tabs(['Select a study', 'Summary report', 'States schedule',
-                 'Direct Illuminance', 'Visualization']
+                 'Direct Illuminance', 'Visualization', 'Export Report (WIP)']
         )
 
     with study_tab:
-        study_menu()
+        api_client, user_api = study_menu()
 
     if st.session_state['run'] is not None \
         or st.session_state['load_method'] == 'Try the sample run':
@@ -55,9 +56,12 @@ def main():
 
         with visualization_tab:
             viewer(content=vtjks_file.read_bytes(), key='viz')
+
+        with report_tab:
+            export_report(user_api)
     else:
         for tab in (summary_tab, states_schedule_tab, dir_ill_tab,
-                    visualization_tab):
+                    visualization_tab, report_tab):
             with tab:
                 st.error('Select a study in the first tab!')
 
