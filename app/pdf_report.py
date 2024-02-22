@@ -299,13 +299,16 @@ class MyDocTemplate(BaseDocTemplate):
 
 
 def create_pdf(
-        output_file: Path, run_folder: Path, report_data: dict, pagesize: tuple = A4, left_margin: float = 1.5*cm,
+        output_file: Path, run_folder: Path, report_data: dict, create_stories: bool, pagesize: tuple = A4, left_margin: float = 1.5*cm,
         right_margin: float = 1.5*cm, top_margin: float = 2*cm,
         bottom_margin: float = 2*cm,
     ):
     output_file = str(output_file)
     folder, vtjks_file, summary, summary_grid, states_schedule, \
         states_schedule_err, hb_model = load_from_folder(run_folder)
+    if create_stories:
+        hb_model.assign_stories_by_floor_height(overwrite=True)
+
     # Create a PDF document
     doc = MyDocTemplate(
         output_file, pagesize=pagesize, leftMargin=left_margin,
@@ -725,8 +728,7 @@ def create_pdf(
             ('TOPPADDING', (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
         ])
-        # column_widths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
-        # colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+
         colWidths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
         _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=colWidths)
         _metric_table.setStyle(table_style)
@@ -743,7 +745,6 @@ def create_pdf(
             story.append(Spacer(width=0*cm, height=0.5*cm))
             story.append(ase_note)
 
-        north_arrow_drawing = draw_north_arrow(north=0, radius=10)
         section_header = Paragraph('Daylight Autonomy', style=styles['h2'])
 
         legend_north_drawing = Drawing(0, 0)
@@ -766,8 +767,8 @@ def create_pdf(
         legend_par.decimal_count = 0
         legend = Legend([0, 100], legend_parameters=legend_par)
 
-        ddd = Drawing(0, 0)
-        gggg = Group()
+        drawing = Drawing(0, 0)
+        group = Group()
         segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
         for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
             points = []
@@ -776,22 +777,22 @@ def create_pdf(
             for vertex in face:
                 points.extend([vertex.x, vertex.y])
             polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
-            gggg.add(polygon)
-            ddd.add(polygon)
+            group.add(polygon)
+            drawing.add(polygon)
             string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
-            gggg.add(string)
-            ddd.add(string)
+            group.add(string)
+            drawing.add(string)
         string = String(x=segment_min.x-5, y=0, text='Daylight Autonomy (300 lux) [%]',textAnchor='end', fontName='Helvetica', fontSize=5)
-        gggg.add(string)
-        ddd.add(string)
-        ddd_bounds = ddd.getBounds()
-        dx = abs(0 - ddd_bounds[0])
-        dy = abs(0 - ddd_bounds[1])
-        ddd.translate(dx, dy)
-        drawing_dimensions_from_bounds(ddd)
+        group.add(string)
+        drawing.add(string)
+        drawing_bounds = drawing.getBounds()
+        dx = abs(0 - drawing_bounds[0])
+        dy = abs(0 - drawing_bounds[1])
+        drawing.translate(dx, dy)
+        drawing_dimensions_from_bounds(drawing)
 
-        translate_group_relative(gggg, north_arrow_group, anchor='e', padding=5)
-        legend_north_drawing.add(gggg)
+        translate_group_relative(group, north_arrow_group, anchor='e', padding=5)
+        legend_north_drawing.add(group)
         drawing_dimensions_from_bounds(legend_north_drawing)
         da_drawing = scale_drawing_to_width(da_drawing, doc.width)
         da_group = KeepTogether(flowables=[section_header, da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
@@ -851,8 +852,8 @@ def create_pdf(
         legend_par.segment_width = 20
         legend_par.decimal_count = 0
         legend = Legend([0, 250], legend_parameters=legend_par)
-        ddd = Drawing(0, 0)
-        gggg = Group()
+        drawing = Drawing(0, 0)
+        group = Group()
         segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
         for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
             points = []
@@ -861,22 +862,22 @@ def create_pdf(
             for vertex in face:
                 points.extend([vertex.x, vertex.y])
             polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
-            gggg.add(polygon)
-            ddd.add(polygon)
+            group.add(polygon)
+            drawing.add(polygon)
             string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
-            gggg.add(string)
-            ddd.add(string)
+            group.add(string)
+            drawing.add(string)
         string = String(x=segment_min.x-5, y=0, text='Direct Sunlight (1000 lux) [hrs]',textAnchor='end', fontName='Helvetica', fontSize=5)
-        gggg.add(string)
-        ddd.add(string)
-        ddd_bounds = ddd.getBounds()
-        dx = abs(0 - ddd_bounds[0])
-        dy = abs(0 - ddd_bounds[1])
-        ddd.translate(dx, dy)
-        drawing_dimensions_from_bounds(ddd)
+        group.add(string)
+        drawing.add(string)
+        drawing_bounds = drawing.getBounds()
+        dx = abs(0 - drawing_bounds[0])
+        dy = abs(0 - drawing_bounds[1])
+        drawing.translate(dx, dy)
+        drawing_dimensions_from_bounds(drawing)
 
-        translate_group_relative(gggg, north_arrow_group, 'e', 5)
-        legend_north_drawing.add(gggg)
+        translate_group_relative(group, north_arrow_group, 'e', 5)
+        legend_north_drawing.add(group)
         drawing_dimensions_from_bounds(legend_north_drawing)
         hrs_above_drawing = scale_drawing_to_width(hrs_above_drawing, doc.width)
         hrs_above_group = KeepTogether(flowables=[section_header, hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
@@ -991,7 +992,7 @@ def create_pdf(
             fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
             polygon = Polygon(points=points, fillColor=fillColor, strokeColor=fillColor, strokeWidth=0)
             hrs_above_drawing.add(polygon)
-        
+
         points = []
         horiz_bound_vertices = horiz_bound_vertices + (horiz_bound_vertices[0],)
         for vertex in horiz_bound_vertices:
@@ -1067,8 +1068,8 @@ def create_pdf(
         legend_par.decimal_count = 0
         legend = Legend([0, 100], legend_parameters=legend_par)
 
-        ddd = Drawing(0, 0)
-        gggg = Group()
+        drawing = Drawing(0, 0)
+        group = Group()
         segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
         for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
             points = []
@@ -1077,22 +1078,22 @@ def create_pdf(
             for vertex in face:
                 points.extend([vertex.x, vertex.y])
             polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
-            gggg.add(polygon)
-            ddd.add(polygon)
+            group.add(polygon)
+            drawing.add(polygon)
             string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
-            gggg.add(string)
-            ddd.add(string)
+            group.add(string)
+            drawing.add(string)
         string = String(x=segment_min.x-5, y=0, text='Daylight Autonomy (300 lux) [%]',textAnchor='end', fontName='Helvetica', fontSize=5)
-        gggg.add(string)
-        ddd.add(string)
-        ddd_bounds = ddd.getBounds()
-        dx = abs(0 - ddd_bounds[0])
-        dy = abs(0 - ddd_bounds[1])
-        ddd.translate(dx, dy)
-        drawing_dimensions_from_bounds(ddd)
+        group.add(string)
+        drawing.add(string)
+        drawing_bounds = drawing.getBounds()
+        dx = abs(0 - drawing_bounds[0])
+        dy = abs(0 - drawing_bounds[1])
+        drawing.translate(dx, dy)
+        drawing_dimensions_from_bounds(drawing)
 
-        translate_group_relative(gggg, north_arrow_group, anchor='e', padding=5)
-        legend_da.add(gggg)
+        translate_group_relative(group, north_arrow_group, anchor='e', padding=5)
+        legend_da.add(group)
         drawing_dimensions_from_bounds(legend_da)
 
         legend_hrs_above = Drawing(0, 0)
@@ -1114,8 +1115,8 @@ def create_pdf(
         legend_par.segment_width = 10
         legend_par.decimal_count = 0
         legend = Legend([0, 250], legend_parameters=legend_par)
-        ddd = Drawing(0, 0)
-        gggg = Group()
+        drawing = Drawing(0, 0)
+        group = Group()
         segment_min, segment_max = legend.segment_mesh.min, legend.segment_mesh.max
         for segment_number, face, segment_color, segment_text_location in zip(legend.segment_numbers, legend.segment_mesh_scene_2d.face_vertices, legend.segment_colors, legend.segment_text_location):
             points = []
@@ -1124,22 +1125,22 @@ def create_pdf(
             for vertex in face:
                 points.extend([vertex.x, vertex.y])
             polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
-            gggg.add(polygon)
-            ddd.add(polygon)
+            group.add(polygon)
+            drawing.add(polygon)
             string = String(x=stl_x, y=-5*1.1, text=str(int(segment_number)), textAnchor='start', fontName='Helvetica', fontSize=5)
-            gggg.add(string)
-            ddd.add(string)
+            group.add(string)
+            drawing.add(string)
         string = String(x=segment_min.x-5, y=0, text='Direct Sunlight (1000 lux) [hrs]',textAnchor='end', fontName='Helvetica', fontSize=5)
-        gggg.add(string)
-        ddd.add(string)
-        ddd_bounds = ddd.getBounds()
-        dx = abs(0 - ddd_bounds[0])
-        dy = abs(0 - ddd_bounds[1])
-        ddd.translate(dx, dy)
-        drawing_dimensions_from_bounds(ddd)
+        group.add(string)
+        drawing.add(string)
+        drawing_bounds = drawing.getBounds()
+        dx = abs(0 - drawing_bounds[0])
+        dy = abs(0 - drawing_bounds[1])
+        drawing.translate(dx, dy)
+        drawing_dimensions_from_bounds(drawing)
 
-        translate_group_relative(gggg, north_arrow_group, 'e', 5)
-        legend_hrs_above.add(gggg)
+        translate_group_relative(group, north_arrow_group, 'e', 5)
+        legend_hrs_above.add(group)
         drawing_dimensions_from_bounds(legend_hrs_above)
 
         legends_table = Table(data=[[scale_drawing_to_width(legend_da, doc.width*0.45), '', scale_drawing_to_width(legend_hrs_above, doc.width*0.45)]], colWidths=[doc.width*0.45, None, doc.width*0.45])
@@ -1154,48 +1155,14 @@ def create_pdf(
         story.append(legends_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        # if grid_id == 'Room_2':
-        #     table_style = TableStyle([
-        #         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        #         ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-        #         ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        #         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        #         ('TOPPADDING', (0, 0), (-1, -1), 0),
-        #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-        #     ])
-        #     _scale_table = Table(
-        #         data=[
-        #             [
-        #                 da_drawing,
-        #                 scale_drawing(da_drawing, 200 / 300, 200 / 300),
-        #                 scale_drawing(da_drawing, 200 / 400, 200 / 400),
-        #                 scale_drawing(da_drawing, 200 / 500, 200 / 500),
-        #                 scale_drawing(da_drawing, 200 / 1000, 200 / 1000),
-        #                 scale_drawing(da_drawing, 200 / 2000, 200 / 2000)
-        #             ],
-        #             [
-        #                 '1:200',
-        #                 '1:300',
-        #                 '1:400',
-        #                 '1:500',
-        #                 '1:1000',
-        #                 '1:2000'
-        #             ]
-        #             ],
-        #         colWidths='*')
-        #     _scale_table.setStyle(table_style)
-        #     story.append(_scale_table)
-        #     story.append(Spacer(width=0*cm, height=0.5*cm))
-
         table, ase_notes = table_from_summary_grid(summary_grid, [grid_id], add_total=False)
-        
+
         story.append(table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         ase_note = values.get('ase_note')
         if ase_note:
             story.append(Paragraph(ase_note, style=styles['Normal']))
-
 
         for grid_info in grids_info:
             if grid_id == grid_info['full_id']:
@@ -1221,8 +1188,8 @@ def create_pdf(
             filtered_datacollection = \
                 datacollection.filter_by_analysis_period(analysis_period=ap)
             filtered_datacollection.total
-            # get the percentage of occupied hours with shading on
 
+            # get the percentage of occupied hours with shading on
             shading_on_pct = round(filtered_datacollection.values.count(1) \
                 / 3650 * 100, 2)
             shading_off_pct = round(filtered_datacollection.values.count(0) \
@@ -1249,7 +1216,7 @@ def create_pdf(
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
                 ])
             )
-            #colWidths = [col_width-12/len(column_widths) for col_width in column_widths]
+
             table = Table([[shading_table, pdf_table]], colWidths=colWidths)
             table.setStyle(
                 TableStyle([
@@ -1263,15 +1230,7 @@ def create_pdf(
             )
             story.append(Spacer(width=0*cm, height=0.5*cm))
             story.append(KeepTogether(flowables=[aperture_group_header, table]))
-            #story.append(ggg)
-            #story.append(Spacer(width=0*cm, height=0.5*cm))
-            #drawing = svg2rlg(img)
-            #drawing = svg2rlg(svg_path)
-            #assert False, drawing
-            #drawing = scale(drawing, scaling_factor=None, width=400, height=None)
-            #story.append(drawing)
 
-        #story.append(NextPageTemplate('grid-page'))
         story.append(PageBreak())
 
     # Build and save the PDF
