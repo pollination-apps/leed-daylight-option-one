@@ -18,7 +18,6 @@ def select_load_method():
     )
 
 
-st.cache_data
 def select_menu(api_client: ApiClient, user_api: UserApi):
     """Select menu to navigate to a run."""
     col_1, col_2 = st.columns(2)

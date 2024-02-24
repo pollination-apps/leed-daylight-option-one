@@ -26,15 +26,15 @@ def multiselect_aperture_groups(aperture_groups: list):
         st.session_state['show_all'] = True
 
 
-def radio_show_all_ase(grids_ids: list):
+def radio_show_all_ase(grids_info: list):
     if st.session_state['show_all_ase']:
         st.session_state['select_ase'] = []
     else:
-        st.session_state['select_ase'] = grids_ids
+        st.session_state['select_ase'] = grids_info
 
 
-def multiselect_ase(grids_ids: list):
-    if len(st.session_state['select_ase']) != len(grids_ids):
+def multiselect_ase(grids_info: list):
+    if len(st.session_state['select_ase']) != len(grids_info):
         st.session_state['show_all_ase'] = True
 
 
