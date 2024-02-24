@@ -1,8 +1,11 @@
 pollination-streamlit==0.8.2
 honeybee-display[full]==0.3.4
 ladybug-charts==1.19.3
+pollination-io==1.0.3
 pollination_streamlit_io==0.84.2
 pollination_streamlit_viewer==0.5.0
 honeybee-radiance==1.66.28
 streamlit>=1.31.1
 pandas>=0.2.1
+reportlab==4.0.9
+pdfrw==0.4

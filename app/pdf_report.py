@@ -5,7 +5,7 @@ import json
 import numpy as np
 from io import BytesIO
 import datetime
-from pdfrw import PdfReader, PdfDict
+from pdfrw import PdfReader
 from pdfrw.buildxobj import pagexobj
 from pdfrw.toreportlab import makerl
 
@@ -23,7 +23,6 @@ from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Par
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
     Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether
 from reportlab.platypus.tableofcontents import TableOfContents
-from svglib.svglib import svg2rlg
 
 from ladybug.analysisperiod import AnalysisPeriod
 from ladybug.datacollection import HourlyContinuousCollection
