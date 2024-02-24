@@ -307,21 +307,20 @@ def process_ase(folder: Path):
             st.session_state['show_all_ase'] = False
             st.session_state['select_ase'] = grid_ids
 
-    aperture_group_schedule_labels = {
+    _labels = {
         True: 'Select sensor grids',
         False: 'Show all sensor grids'
     }
     st.radio(
         'Select or show all sensor grids',
-        options=[True, False], format_func=lambda x: aperture_group_schedule_labels[x],
+        options=[True, False], format_func=lambda x: _labels[x],
         horizontal=True, label_visibility='collapsed',
-        on_change=radio_show_all_ase, args=(grid_ids,), key='show_all_ase'
+        on_change=radio_show_all_ase, args=(grids_info,), key='show_all_ase'
     )
 
     st.multiselect(
-        'Select sensor grids', grid_ids,
-        label_visibility='collapsed',
-        on_change=multiselect_ase, args=(grid_ids,),
+        'Select sensor grids', grids_info, format_func=lambda gi: gi['name'],
+        label_visibility='collapsed', on_change=multiselect_ase, args=(grids_info,),
         key='select_ase'
     )
 
@@ -337,5 +336,5 @@ def process_ase(folder: Path):
             value=float(10), format='%.2f',
             key='legend_max', on_change=legend_max_on_change)
 
-    for grid_id in st.session_state['select_ase']:
-        figure_ase(grid_id, results_folder)
+    for grid_info in st.session_state['select_ase']:
+        figure_ase(grid_info, results_folder)

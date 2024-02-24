@@ -161,8 +161,10 @@ def figure_aperture_group_schedule(aperture_group: str,
     return fig
 
 
-def figure_ase(grid_id: str, results_folder: Path):
-    with open (results_folder.joinpath(f'{grid_id}.json')) as file:
+def figure_ase(grid_info: dict, results_folder: Path):
+    full_id = grid_info['full_id']
+    grid_name = grid_info['name']
+    with open (results_folder.joinpath(f'{full_id}.json')) as file:
         data_dict = json.load(file)
     hourly_data = HourlyContinuousCollection.from_dict(data_dict)
 
@@ -183,7 +185,7 @@ def figure_ase(grid_id: str, results_folder: Path):
             customdata=np.stack((df["month_names"], df["day"]), axis=-1),
             hovertemplate=(
                 "<b>"
-                + grid_id
+                + grid_name
                 + ": %{z:.2f}%"
                 + "</b><br>Month: %{customdata[0]}<br>Day: %{customdata[1]}<br>"
                 + "Hour: %{y}:00<br>"
@@ -203,7 +205,7 @@ def figure_ase(grid_id: str, results_folder: Path):
     fig.update_yaxes(title_text="Hours of the day")
 
     fig_title = {
-        'text': grid_id,
+        'text': grid_name,
         'y': 1,
         'x': 0.5,
         'xanchor': 'center',
@@ -220,4 +222,4 @@ def figure_ase(grid_id: str, results_folder: Path):
     fig.update_xaxes(showline=True, linewidth=1, linecolor="black", mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, linecolor="black", mirror=True)
 
-    st.plotly_chart(fig, use_container_width=True, config=get_figure_config(grid_id))
+    st.plotly_chart(fig, use_container_width=True, config=get_figure_config(grid_name))
