@@ -35,7 +35,7 @@ def load_results() -> tuple:
     """Load results from a run folder. If the the run folder does not exist
     the files will be downloaded to the run folder."""
     if not st.session_state.run_folder.exists():
-        st.session_state.run_folder.mkdir()
+        st.session_state.run_folder.mkdir(parents=True, exist_ok=True)
         # download results to run folder
         with st.spinner('Downloading files...'):
             download_files()

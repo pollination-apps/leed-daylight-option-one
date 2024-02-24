@@ -1,3 +1,4 @@
+import streamlit as st
 from pathlib import Path
 from functools import partial
 import pandas as pd
@@ -353,7 +354,7 @@ def create_pdf(
 
     header_content = Paragraph('', styles['Normal'])
     footer_content = Paragraph('LEED Daylight Option I', styles['Normal'])
-    pollination_image = 'assets/images/pollination.png'
+    pollination_image = st.session_state.target_folder.joinpath('assets', 'images', 'pollination.png')
     title_page_template = PageTemplate(id='title-page', frames=[title_frame], pagesize=pagesize)
     base_template = PageTemplate(
         'base',
