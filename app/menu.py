@@ -88,8 +88,7 @@ def select_menu(api_client: ApiClient, user_api: UserApi):
 def get_run(api_client: ApiClient, user_api: UserApi):
     """Get run."""
     if st.session_state['load_method'] == 'Load from a project':
-        user_api = select_menu(api_client, user_api)
-        return user_api
+        select_menu(api_client, user_api)
     elif st.session_state['load_method'] == 'Load from a URL':
         run = run_selector(
             api_client, default=st.session_state['run_url'],
