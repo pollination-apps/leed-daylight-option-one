@@ -39,8 +39,7 @@ def select_menu(api_client: ApiClient, user_api: UserApi):
                 project = select_project(
                     'select-project',
                     api_client,
-                    project_owner=username,
-                    default_project_id=st.session_state['project_id']
+                    project_owner=username
                 )
 
             if project and 'name' in project:
