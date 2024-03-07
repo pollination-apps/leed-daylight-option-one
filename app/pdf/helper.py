@@ -2,6 +2,21 @@ from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing, Circle, Polygon, PolyLine, Group
 
 
+UNITS_AREA = {
+    'Meters': 'm',
+    'Millimeters': 'mm',
+    'Feet': 'ft',
+    'Inches': 'in',
+    'Centimeters': 'cm'
+}
+
+
+ROWBACKGROUNDS = [
+    colors.Color(248 / 255, 248 / 255, 248 / 255),
+    colors.Color(253 / 255, 253 / 255, 253 / 255)
+]
+
+
 def scale_drawing(drawing: Drawing, sx: float, sy: float):
     new_drawing = drawing.copy()
     new_drawing.scale(sx, sy)
@@ -20,6 +35,19 @@ def scale_drawing_to_width(drawing: Drawing, width: float):
     new_drawing.scale(sx=scale_factor, sy=scale_factor)
     new_drawing.width = width
     new_drawing.height = new_height
+    return new_drawing
+
+
+def scale_drawing_to_height(drawing: Drawing, height: float):
+    new_drawing = drawing.copy()
+    x1, y1, x2, y2 = new_drawing.getBounds()
+    contents_width = x2 - x1
+    contents_height = y2 - y1
+    scale_factor = height / contents_height
+    new_width = contents_width * scale_factor
+    new_drawing.scale(sx=scale_factor, sy=scale_factor)
+    new_drawing.width = new_width
+    new_drawing.height = height
     return new_drawing
 
 

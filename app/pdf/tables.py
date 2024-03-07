@@ -4,12 +4,15 @@ from reportlab.lib import colors
 from reportlab.platypus import Paragraph, Table, TableStyle
 from reportlab.lib.units import mm
 
+from pdf.helper import ROWBACKGROUNDS, UNITS_AREA
 from pdf.styles import STYLES
 from pdf.colors import get_ase_cell_color, get_sda_cell_color
 from pdf.template import MyDocTemplate
 
+from honeybee.model import Model
 
-def table_from_summary_grid(summary_grid: dict, grid_filter: list = None, add_total: bool = True):
+
+def table_from_summary_grid(model: Model, summary_grid: dict, grid_filter: list = None, add_total: bool = True):
     if grid_filter:
         summary_grid = {k: summary_grid[k] for k in grid_filter if k in summary_grid}
     df = pd.DataFrame.from_dict(summary_grid).transpose()
@@ -23,9 +26,9 @@ def table_from_summary_grid(summary_grid: dict, grid_filter: list = None, add_to
             columns={
                 'ase': 'ASE [%]',
                 'sda': 'sDA [%]',
-                'floor_area_passing_ase': 'Floor area passing ASE',
-                'floor_area_passing_sda': 'Floor area passing sDA',
-                'total_floor_area': 'Total floor area'
+                'floor_area_passing_ase': f'Floor area passing ASE [{UNITS_AREA[model.units]}2]',
+                'floor_area_passing_sda': f'Floor area passing sDA [{UNITS_AREA[model.units]}2]',
+                'total_floor_area': f'Total floor area [{UNITS_AREA[model.units]}2]'
                 }, inplace=True)
     except Exception:
         df = df[
@@ -53,15 +56,14 @@ def table_from_summary_grid(summary_grid: dict, grid_filter: list = None, add_to
     if not all(n=='' for n in ase_notes):
         df['ASE Note'] = ase_notes
 
-    #data = df.values.tolist()
     if add_total:
         total_row = [
             Paragraph('Total'),
             Paragraph(''),
             Paragraph(''),
-            Paragraph(str(round(df['Floor area passing ASE'].sum(), 2))),
-            Paragraph(str(round(df['Floor area passing sDA'].sum(), 2))),
-            Paragraph(str(round(df['Total floor area'].sum(), 2))),
+            Paragraph(str(round(df[f'Floor area passing ASE [{UNITS_AREA[model.units]}2]'].sum(), 2))),
+            Paragraph(str(round(df[f'Floor area passing sDA [{UNITS_AREA[model.units]}2]'].sum(), 2))),
+            Paragraph(str(round(df[f'Total floor area [{UNITS_AREA[model.units]}2]'].sum(), 2))),
             Paragraph('')
         ]
     df = df.astype(str)
@@ -71,8 +73,12 @@ def table_from_summary_grid(summary_grid: dict, grid_filter: list = None, add_to
     table_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.2, colors.black)
     ])
+    if add_total:
+        table_style.add('ROWBACKGROUNDS', (0, 1), (-1, -2), ROWBACKGROUNDS)
+    else:
+        table_style.add('ROWBACKGROUNDS', (0, 1), (-1, -1), ROWBACKGROUNDS)
 
     formatted_table_data = []
     # add additional commands to table style
@@ -93,6 +99,7 @@ def table_from_summary_grid(summary_grid: dict, grid_filter: list = None, add_to
 
     if add_total:
         formatted_table_data.append(total_row)
+        table_style.add('LINEABOVE', (0, -1), (-1, -1), 0.2, colors.black)
 
     table = Table(formatted_table_data, colWidths='*', repeatRows=1, rowSplitRange=0, spaceBefore=5, spaceAfter=5)
     table.setStyle(table_style)
