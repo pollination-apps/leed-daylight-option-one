@@ -30,11 +30,13 @@ from ladybug.datacollection import HourlyContinuousCollection
 from ladybug.color import Colorset, ColorRange
 from ladybug.legend import Legend, LegendParameters
 from honeybee.model import Model, Room
+from honeybee_radiance.modifier.material.glass import Glass
 
 from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
-from pdf.helper import scale_drawing, scale_drawing_to_width, create_north_arrow, \
-    draw_north_arrow, translate_group_relative, drawing_dimensions_from_bounds
+from pdf.helper import scale_drawing, scale_drawing_to_width, scale_drawing_to_height, \
+    create_north_arrow, draw_north_arrow, translate_group_relative, \
+    drawing_dimensions_from_bounds, UNITS_AREA, ROWBACKGROUNDS
 from pdf.flowables import PdfImage
 from pdf.template import MyDocTemplate, NumberedPageCanvas, _header_and_footer
 from pdf.styles import STYLES
@@ -126,7 +128,7 @@ def create_pdf(
     story.append(Spacer(width=0*cm, height=0.5*cm))
 
     story.append(Paragraph("Space Overview", style=STYLES['h2']))
-    table, ase_notes = table_from_summary_grid(summary_grid)
+    table, ase_notes = table_from_summary_grid(hb_model, summary_grid)
     story.append(table)
 
     if not all(n=='' for n in ase_notes):
@@ -284,7 +286,7 @@ def create_pdf(
         story.append(_metric_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        table, ase_notes = table_from_summary_grid(summary_grid, grid_filter=floor_sensor_grids)
+        table, ase_notes = table_from_summary_grid(hb_model, summary_grid, grid_filter=floor_sensor_grids)
         story.append(table)
 
         if not all(n=='' for n in ase_notes):
@@ -465,6 +467,10 @@ def create_pdf(
 
     # SUMMARY OF EACH GRID
     for grid_id, values in summary_grid.items():
+        # get room object
+        sensor_grid = sensor_grids[grid_id]
+        room: Room = hb_model.rooms_by_identifier([sensor_grid.room_identifier])[0]
+
         story.append(Paragraph(grid_id, style=STYLES['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
@@ -499,8 +505,6 @@ def create_pdf(
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         # heat map
-        sensor_grid = sensor_grids[grid_id]
-        room: Room = hb_model.rooms_by_identifier([sensor_grid.room_identifier])[0]
         horiz_bound = room.horizontal_boundary()
         room_min = room.min
         room_max = room.max
@@ -514,11 +518,6 @@ def create_pdf(
         drawing_scale = 200
         drawing_width = (_width / drawing_scale) * 1000 * mm
         drawing_height = drawing_width / _ratio
-
-        ##################################
-        drawing_3d = draw_room_isometric(room, orientation=ViewOrientation.SE)
-        story.append(drawing_3d)
-        ##################################
 
         da_drawing = Drawing(drawing_width, drawing_height)
         da = np.loadtxt(run_folder.joinpath('leed-summary', 'results', 'da', f'{grid_id}.da'))
@@ -710,7 +709,7 @@ def create_pdf(
         story.append(legends_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        table, ase_notes = table_from_summary_grid(summary_grid, [grid_id], add_total=False)
+        table, ase_notes = table_from_summary_grid(hb_model, summary_grid, [grid_id], add_total=False)
 
         story.append(table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -734,10 +733,64 @@ def create_pdf(
             'states is presented in a table.'
         )
         story.append(Paragraph(body_text, style=STYLES['BodyText']))
+
         for aperture_group in light_paths:
             aperture_group_header = Paragraph(aperture_group, style=STYLES['h3'])
 
+            aperture_data = []
+            aperture_data.append(
+                [
+                    Paragraph('Name', style=STYLES['Normal_BOLD']),
+                    Paragraph(f'Area [{UNITS_AREA[hb_model.units]}2]', style=STYLES['Normal_BOLD']),
+                    Paragraph('Transmittance', style=STYLES['Normal_BOLD'])
+                ]
+            )
+            for aperture in room.apertures:
+                if aperture.properties.radiance.dynamic_group_identifier == aperture_group:
+                    modifier = aperture.properties.radiance.modifier
+                    if isinstance(modifier, Glass):
+                        average_transmittance = round(modifier.average_transmittance, 2)
+                    else:
+                        average_transmittance = ''
+                    aperture_data.append([
+                        aperture.display_name,
+                        round(aperture.area, 2),
+                        average_transmittance
+                    ])
+            aperture_table = Table(data=aperture_data)
+            aperture_table.setStyle(
+                TableStyle([
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.2, colors.black),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), ROWBACKGROUNDS)
+                ])
+            )
+
             drawing_3d = draw_room_isometric(room, orientation=ViewOrientation.SE, dynamic_group_identifier=aperture_group)
+
+            colWidths = [doc.width*(1/2), doc.width*(1/2)]
+            drawing_table = Table([[scale_drawing_to_height(drawing_3d, 3*cm)]])
+            drawing_table.setStyle(
+                TableStyle([
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTRE'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                ])
+            )
+
+            table_1 = Table([[aperture_table, drawing_table]], colWidths=colWidths)
+            table_1.setStyle(
+                TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+                ])
+            )
 
             datacollection = \
                 HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
@@ -754,17 +807,23 @@ def create_pdf(
                 / 3650 * 100, 2)
 
             shading_data_table = [
-                ['', 'Occupied Hours'],
+                ['', Paragraph('Occupied Hours', style=STYLES['Normal_BOLD'])],
                 ['Shading On', f'{shading_on_pct}%'],
                 ['Shading Off', f'{shading_off_pct}%']
             ]
             shading_table = Table(data=shading_data_table)
+            shading_table.setStyle(
+                TableStyle([
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.2, colors.black),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), ROWBACKGROUNDS)
+                ])
+            )
 
             # get figure
             figure = figure_aperture_group_schedule(aperture_group, datacollection)
             fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
-            colWidths = [doc.width*(1/3), doc.width*(2/3)]
-            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*(2/3), height=None, keep_ratio=True)
+            colWidths = [doc.width*0.35, None, doc.width*0.60]
+            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*0.60, height=None, keep_ratio=True)
             pdf_table = Table([[pdf_image]])
             pdf_table.setStyle(
                 TableStyle([
@@ -775,7 +834,7 @@ def create_pdf(
                 ])
             )
 
-            table = Table([[shading_table, pdf_table]], colWidths=colWidths)
+            table = Table([[shading_table, '', pdf_table]], colWidths=colWidths)
             table.setStyle(
                 TableStyle([
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
@@ -787,15 +846,12 @@ def create_pdf(
                 ])
             )
             story.append(Spacer(width=0*cm, height=0.5*cm))
-            story.append(KeepTogether(flowables=[aperture_group_header, drawing_3d, table]))
+            story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), table_1, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
-        break
 
-    # Build and save the PDF
+    # build and save the PDF
     doc.multiBuild(
         story,
-        #onFirstPage=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
-        #onLaterPages=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image),
         canvasmaker=partial(NumberedPageCanvas, skip_pages=doc.skip_pages, start_on_skip_pages=doc.start_on_skip_pages)
     )
