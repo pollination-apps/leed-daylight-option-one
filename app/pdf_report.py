@@ -33,269 +33,14 @@ from honeybee.model import Model, Room
 
 from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
-
-
-class NumberedPageCanvas(canvas.Canvas):
-    """
-    http://code.activestate.com/recipes/546511-page-x-of-y-with-reportlab/
-    http://code.activestate.com/recipes/576832/
-    http://www.blog.pythonlibrary.org/2013/08/12/reportlab-how-to-add-page-numbers/
-    https://stackoverflow.com/a/59882495/
-    """
-
-    def __init__(self, *args, **kwargs):
-        """Constructor."""
-        self.skip_pages = kwargs.pop('skip_pages', 0)
-        self.start_on_skip_pages = kwargs.pop('start_on_skip_pages', None)
-        super().__init__(*args, **kwargs)
-        self.pages = []
-
-    def showPage(self):
-        """On a page break, add information to the list."""
-        self.pages.append(dict(self.__dict__))
-        self._doc.pageCounter += 1
-        self._startPage()
-
-    def save(self):
-        """Add the page number to each page (page x of y)."""
-        page_count = len(self.pages)
-
-        for page in self.pages:
-            self.__dict__.update(page)
-            self.draw_page_number(page_count)
-            super().showPage()
-
-        super().save()
-
-    def draw_page_number(self, page_count):
-        """Add the page number."""
-        if self._pageNumber > self.skip_pages:
-            if self.start_on_skip_pages:
-                page = "Page %s of %s" % (self._pageNumber - self.skip_pages, page_count - self.skip_pages)
-                self.setFont("Helvetica", 9)
-                self.drawRightString(195 * mm, 15 * mm, page)
-            else:
-                page = "Page %s of %s" % (self._pageNumber, page_count)
-                self.setFont("Helvetica", 9)
-                self.drawRightString(195 * mm, 15 * mm, page)
-
-
-def _header(canvas, doc, content, logo: None):
-    canvas.saveState()
-    w, h = content.wrap(doc.width, doc.topMargin)
-    content_width = \
-        stringWidth(content.text, fontName=content.style.fontName, fontSize=content.style.fontSize)
-    content.drawOn(
-        canvas,
-        doc.leftMargin+doc.width-content_width,
-        doc.bottomMargin+doc.height+doc.topMargin-15*mm+1*mm
-    )
-    if logo:
-        canvas.drawImage(
-            logo, x=doc.leftMargin,
-            y=doc.bottomMargin+doc.height+doc.topMargin-15*mm+1*mm,
-            height=5*mm,
-            preserveAspectRatio=True,
-            anchor='w',
-            mask='auto'
-        )
-    canvas.setLineWidth(0.2)
-    canvas.line(
-        doc.leftMargin,
-        doc.bottomMargin + doc.height + doc.topMargin - 15 * mm,
-        doc.leftMargin + doc.width,
-        doc.bottomMargin + doc.height + doc.topMargin - 15 * mm)
-    canvas.restoreState()
-
-def _footer(canvas, doc, content):
-    canvas.saveState()
-    w, h = content.wrap(doc.width, doc.bottomMargin)
-    content.drawOn(canvas, doc.leftMargin, 15 * mm)
-    canvas.restoreState()
-
-def _header_and_footer(canvas, doc, header_content, footer_content, logo):
-    _header(canvas, doc, header_content, logo)
-    _footer(canvas, doc, footer_content)
-
-
-class PdfImage(Flowable):
-    """
-    PdfImage wraps the first page from a PDF file as a Flowable
-    which can be included into a ReportLab Platypus document.
-    Based on the vectorpdf extension in rst2pdf (http://code.google.com/p/rst2pdf/)
-
-    This can be used from the place where you want to return your matplotlib image
-    as a Flowable:
-
-        img = BytesIO()
-
-        fig, ax = plt.subplots(figsize=(canvaswidth,canvaswidth))
-
-        ax.plot([1,2,3],[6,5,4],antialiased=True,linewidth=2,color='red',label='a curve')
-
-        fig.savefig(img,format='PDF')
-
-        return(PdfImage(img))
-
-    """
-
-    def __init__(self, filename_or_object, width=None, height=None, kind='direct', keep_ratio=True):
-        # If using StringIO buffer, set pointer to beginning
-        if hasattr(filename_or_object, 'read'):
-            filename_or_object.seek(0)
-        self.page = PdfReader(filename_or_object, decompress=False).pages[0]
-        self.xobj = pagexobj(self.page)
-        self.imageWidth = width
-        self.imageHeight = height
-        x1, y1, x2, y2 = self.xobj.BBox
-
-        self._w, self._h = x2 - x1, y2 - y1
-        if keep_ratio:
-            ratio = self._w / self._h
-            if not self.imageWidth:
-                self.imageWidth = height * ratio
-            elif not self.imageHeight:
-                self.imageHeight = width / ratio
-            else:
-                raise ValueError('Either width or height must be specified.')
-        else:
-            if not self.imageWidth:
-                self.imageWidth = self._w
-            if not self.imageHeight:
-                self.imageHeight = self._h
-        self._ratio = float(self.imageWidth) / self.imageHeight
-        if kind in ['direct','absolute'] or width==None or height==None:
-            self.drawWidth = width or self.imageWidth
-            self.drawHeight = height or self.imageHeight
-        elif kind in ['bound','proportional']:
-            factor = min(float(width)/self._w,float(height)/self._h)
-            self.drawWidth = self._w*factor
-            self.drawHeight = self._h*factor
-
-    def wrap(self, availableWidth, availableHeight):
-        """
-        returns draw- width and height
-
-        convenience function to adapt your image 
-        to the available Space that is available
-        """
-        return self.drawWidth, self.drawHeight
-
-    def drawOn(self, canv, x, y, _sW=0):
-        """
-        translates Bounding Box and scales the given canvas
-        """
-        x = 0 # override to avoid margins of frame
-        y = 0 # override to avoid margins of frame
-        if _sW > 0 and hasattr(self, 'hAlign'):
-            a = self.hAlign
-            if a in ('CENTER', 'CENTRE', TA_CENTER):
-                x += 0.5*_sW
-            elif a in ('RIGHT', TA_RIGHT):
-                x += _sW
-            elif a not in ('LEFT', TA_LEFT):
-                raise ValueError("Bad hAlign value " + str(a))
-
-        #xobj_name = makerl(canv._doc, self.xobj)
-        xobj_name = makerl(canv, self.xobj)
-
-        xscale = self.drawWidth/self._w
-        yscale = self.drawHeight/self._h
-
-        x -= self.xobj.BBox[0] * xscale
-        y -= self.xobj.BBox[1] * yscale
-
-        canv.saveState()
-        canv.translate(x, y)
-        canv.scale(xscale, yscale)
-        canv.doForm(xobj_name)
-        canv.restoreState()
-
-
-def scale_drawing(drawing: Drawing, sx: float, sy: float):
-    new_drawing = drawing.copy()
-    new_drawing.scale(sx, sy)
-    new_drawing.width = new_drawing.width * sx
-    new_drawing.height = new_drawing.height * sy
-    return new_drawing
-
-
-def scale_drawing_to_width(drawing: Drawing, width: float):
-    new_drawing = drawing.copy()
-    x1, y1, x2, y2 = new_drawing.getBounds()
-    contents_width = x2 - x1
-    contents_height = y2 - y1
-    scale_factor = width / contents_width
-    new_height = contents_height * scale_factor
-    new_drawing.scale(sx=scale_factor, sy=scale_factor)
-    new_drawing.width = width
-    new_drawing.height = new_height
-    return new_drawing
-
-
-def create_north_arrow(north: float, radius: float) -> Group:
-    north_arrow = Group(
-        Polygon(points=[-radius*0.2, 0, radius*0.2, 0, 0, radius], fillColor=colors.black, strokeColor=colors.black, strokeWidth=0),
-        Circle(0, 0, radius, strokeWidth=radius*0.025, fillOpacity=0),
-        PolyLine([-radius, 0, radius, 0], strokeWidth=radius*0.025/2)
-    )
-    north_arrow.rotate(north)
-    return north_arrow
-
-def draw_north_arrow(north: float, radius: float) -> Drawing:
-    north_arrow_drawing = Drawing(width=radius*2, height=radius*2)
-    group = create_north_arrow(north, radius)
-    for elem in group.contents:
-        north_arrow_drawing.add(elem)
-    north_arrow_drawing.translate(radius, radius)
-    return north_arrow_drawing
-
-def translate_group_relative(group: Group, anchor_group: Group, anchor: str, padding: float):
-    anchor_bounds = anchor_group.getBounds()
-    group_bounds = group.getBounds()
-    if anchor == 'e':
-        new_x = anchor_bounds[2]
-        new_y = (anchor_bounds[1] + anchor_bounds[3]) / 2
-        old_y = (group_bounds[1] + group_bounds[3]) / 2
-        dx = new_x - group_bounds[0] + padding
-        dy = new_y - old_y
-        group.translate(dx, dy)
-    else:
-        raise NotImplementedError()
-
-def drawing_dimensions_from_bounds(drawing: Drawing):
-    """Set the width and height based on the boundaries of the contents."""
-    drawing_bounds = drawing.getBounds()
-    if drawing_bounds[0] != 0 or drawing_bounds[1] != 0:
-        dx = 0 - drawing_bounds[0]
-        dy = 0 - drawing_bounds[1]
-        drawing.translate(dx, dy)
-    drawing_bounds = drawing.getBounds()
-    drawing.width = abs(drawing_bounds[2] - drawing_bounds[0])
-    drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
-
-class MyDocTemplate(BaseDocTemplate):
-
-    def __init__(self, filename, **kw):
-        self.allowSplitting = 0
-        self.skip_pages = kw.pop('skip_pages', 0)
-        self.start_on_skip_pages = kw.pop('start_on_skip_pages', None)
-        BaseDocTemplate.__init__(self, filename, **kw)
-
-    def afterFlowable(self, flowable):
-        "Registers TOC entries."
-        if isinstance(flowable, Paragraph):
-            text = flowable.getPlainText()
-            style = flowable.style.name
-            pageNum = self.page - self.skip_pages
-            if style == 'Heading1':
-                key = 'h1-%s' % self.seq.nextf('Heading1')
-                self.canv.bookmarkPage(key)
-                self.notify('TOCEntry', (0, text, pageNum))
-            # if style == 'Heading2':
-            #     key = 'h2-%s' % self.seq.nextf('heading2')
-            #     self.canv.bookmarkPage(key)
-            #     self.notify('TOCEntry', (1, text, pageNum))
+from pdf.helper import scale_drawing, scale_drawing_to_width, create_north_arrow, \
+    draw_north_arrow, translate_group_relative, drawing_dimensions_from_bounds
+from pdf.flowables import PdfImage
+from pdf.template import MyDocTemplate, NumberedPageCanvas, _header_and_footer
+from pdf.styles import STYLES
+from pdf.tables import table_from_summary_grid, create_metric_table
+from pdf.colors import get_ase_cell_color, get_sda_cell_color
+from pdf.drawings import draw_room_isometric, ViewOrientation
 
 
 def create_pdf(
@@ -317,43 +62,10 @@ def create_pdf(
         start_on_skip_pages=True
     )
 
-    # Set up styles
-    styles = getSampleStyleSheet()
-
-    # modify styles
-    styles['BodyText'].leading = 18
-
-    styles.add(ParagraphStyle(name='Normal_BOLD',
-                              parent=styles['Normal'],
-                              fontSize=10,
-                              leading=12,
-                              fontName=_baseFontNameB)
-    )
-    styles.add(ParagraphStyle(name='Normal_CENTER',
-                              parent=styles['Normal'],
-                              alignment=TA_CENTER,
-                              fontSize=10,
-                              leading=12)
-    )
-    styles.add(ParagraphStyle(name='Normal_RIGHT',
-                              parent=styles['Normal'],
-                              alignment=TA_RIGHT,
-                              fontSize=10,
-                              leading=12)
-    )
-    styles.add(ParagraphStyle(name='Heading1_CENTER',
-                              parent=styles['Heading1'],
-                              alignment=TA_CENTER),
-                alias='h1_c')
-    styles.add(ParagraphStyle(name='Heading2_CENTER',
-                              parent=styles['Heading2'],
-                              alignment=TA_CENTER),
-                alias='h2_c')
-
     title_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, showBoundary=0, id='title-frame')
 
-    header_content = Paragraph('', styles['Normal'])
-    footer_content = Paragraph('LEED Daylight Option I', styles['Normal'])
+    header_content = Paragraph('', STYLES['Normal'])
+    footer_content = Paragraph('LEED Daylight Option I', STYLES['Normal'])
     pollination_image = st.session_state.target_folder.joinpath('assets', 'images', 'pollination.png')
     title_page_template = PageTemplate(id='title-page', frames=[title_frame], pagesize=pagesize)
     base_template = PageTemplate(
@@ -366,190 +78,54 @@ def create_pdf(
     doc.addPageTemplates(base_template)
 
     story = []
+
+    ### TITLE PAGE
     front_page_table = Table(
         [
-            [Paragraph('LEED Daylight Option I Report', styles['h1_c'])],
-            [Paragraph(f'Project: {report_data["project"]}', styles['h2_c'])],
+            [Paragraph('LEED Daylight Option I Report', STYLES['h1_c'])],
+            [Paragraph(f'Project: {report_data["project"]}', STYLES['h2_c'])],
             [],
-            [Paragraph(f'Prepared by: {report_data["prepared_by"]}', styles['Normal_CENTER'])],
-            [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}', styles['Normal_CENTER'])]
+            [Paragraph(f'Prepared by: {report_data["prepared_by"]}', STYLES['Normal_CENTER'])],
+            [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}', STYLES['Normal_CENTER'])]
         ]
     )
     host_table = Table(
         [[front_page_table]], colWidths=[doc.width]
     )
+    # add spacer to center the table vertically
     story.append(Spacer(width=0*cm, height=doc.height/2-host_table.wrap(0, 0)[1]))
     story.append(host_table)
     story.append(NextPageTemplate('base'))
     story.append(PageBreak())
 
+    ### TABLE OF CONTENTS
     toc = TableOfContents()
     toc.dotsMinLevel = 0
     story.append(toc)
     story.append(PageBreak())
 
-    document_title = Paragraph("Summary", styles['h1'])
-    story.append(document_title)
+    ### SUMMARY PAGE
+    story.append(Paragraph("Summary", STYLES['h1']))
 
     if summary['credits'] > 0:
         story.append(
-            Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h2'].clone(name='h2_GREEN', textColor='green'))
+            Paragraph(f'LEED Credits: {summary["credits"]}', style=STYLES['h2'].clone(name='h2_GREEN', textColor='green'))
         )
     else:
         story.append(
-            Paragraph(f'LEED Credits: {summary["credits"]}', style=styles['h2'].clone(name='h2_BLACK', textColor='black'))
+            Paragraph(f'LEED Credits: {summary["credits"]}', style=STYLES['h2'].clone(name='h2_BLACK', textColor='black'))
         )
     story.append(Spacer(width=0*cm, height=0.5*cm))
 
     if 'note' in summary:
-        story.append(Paragraph(summary['note'], style=styles['BodyText']))
+        story.append(Paragraph(summary['note'], style=STYLES['BodyText']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-    def get_sda_cell_color(val: float):
-        val = float(val)
-        if val >= 75:
-            return colors.Color(0, 255 / 255, 0, 0.3)
-        elif val >= 55:
-            return colors.Color(85 / 255, 255 / 255, 0, 0.3)
-        elif val >= 40:
-            return colors.Color(170 / 255, 255 / 255, 0, 0.3)
-        else:
-            return colors.Color(255 / 255, 170 / 255, 0, 0.3)
-
-    def get_ase_cell_color(val: float):
-        val = float(val)
-        if val > 10:
-            return colors.Color(255 / 255, 170 / 255, 0, 0.3)
-        else:
-            return colors.Color(0, 255 / 255, 0, 0.3)
-
-    _sda_table = Table(data=[[Paragraph(f'sDA: {summary["sda"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
-    table_style = TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-    ])
-    table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(summary["sda"]))
-    _sda_table.setStyle(table_style)
-
-    _ase_table = Table(data=[[Paragraph(f'ASE: {summary["ase"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
-    table_style = TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-    ])
-    table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(summary["ase"]))
-    _ase_table.setStyle(table_style)
-    table_style = TableStyle([
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-    ])
-    _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=[doc.width*0.45, None, doc.width*0.45])
-    _metric_table.setStyle(table_style)
+    _metric_table = create_metric_table(doc, summary['sda'], summary['ase'])
     story.append(_metric_table)
-
     story.append(Spacer(width=0*cm, height=0.5*cm))
 
-    # Create content
-    story.extend([
-        Paragraph("Space Overview", style=styles['h2'])
-        ]
-    )
-
-    def table_from_summary_grid(summary_grid, grid_filter: list = None, add_total: bool = True):
-        if grid_filter:
-            summary_grid = {k: summary_grid[k] for k in grid_filter if k in summary_grid}
-        df = pd.DataFrame.from_dict(summary_grid).transpose()
-        try:
-            df = df[
-                ['ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda',
-                'total_floor_area']
-                ]
-            # rename columns
-            df.rename(
-                columns={
-                    'ase': 'ASE [%]',
-                    'sda': 'sDA [%]',
-                    'floor_area_passing_ase': 'Floor area passing ASE',
-                    'floor_area_passing_sda': 'Floor area passing sDA',
-                    'total_floor_area': 'Total floor area'
-                    }, inplace=True)
-        except Exception:
-            df = df[
-                ['ase', 'sda', 'sensor_count_passing_ase',
-                'sensor_count_passing_sda', 'total_sensor_count']
-                ]
-            # rename columns
-            df.rename(
-                columns={
-                    'ase': 'ASE [%]',
-                    'sda': 'sDA [%]',
-                    'sensor_count_passing_ase': 'Sensor count passing ASE',
-                    'sensor_count_passing_sda': 'Sensor count passing sDA',
-                    'total_sensor_count': 'Total sensor count'
-                }
-            )
-        df = df.rename_axis('Space Name').reset_index()
-
-        ase_notes = []
-        for data in summary_grid.values():
-            if 'ase_note' in data:
-                ase_notes.append('1)')
-            else:
-                ase_notes.append('')
-        if not all(n=='' for n in ase_notes):
-            df['ASE Note'] = ase_notes
-
-        #data = df.values.tolist()
-        if add_total:
-            total_row = [
-                Paragraph('Total'),
-                Paragraph(''),
-                Paragraph(''),
-                Paragraph(str(round(df['Floor area passing ASE'].sum(), 2))),
-                Paragraph(str(round(df['Floor area passing sDA'].sum(), 2))),
-                Paragraph(str(round(df['Total floor area'].sum(), 2))),
-                Paragraph('')
-            ]
-        df = df.astype(str)
-        table_data =  [tuple(df)] + list(df.itertuples(index=False, name=None))
-
-        # base table style
-        table_style = TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ])
-
-        formatted_table_data = []
-        # add additional commands to table style
-        for idx_row, row in enumerate(table_data):
-            formatted_row = []
-            for idx_cell, cell_value in enumerate(row):
-                if idx_cell == 1 and idx_row != 0:
-                    cell_color = get_ase_cell_color(cell_value)
-                    table_style.add('BACKGROUND', (idx_cell, idx_row), (idx_cell, idx_row), cell_color)
-                if idx_cell == 2 and idx_row != 0:
-                    cell_color = get_sda_cell_color(cell_value)
-                    table_style.add('BACKGROUND', (idx_cell, idx_row), (idx_cell, idx_row), cell_color)
-                if idx_row == 0:
-                    formatted_row.append(Paragraph(cell_value, style=styles['Normal_BOLD']))
-                else:
-                    formatted_row.append(Paragraph(cell_value))
-            formatted_table_data.append(formatted_row)
-
-        if add_total:
-            formatted_table_data.append(total_row)
-
-        table = Table(formatted_table_data, colWidths='*', repeatRows=1, rowSplitRange=0, spaceBefore=5, spaceAfter=5)
-        table.setStyle(table_style)
-
-        return table, ase_notes
-
+    story.append(Paragraph("Space Overview", style=STYLES['h2']))
     table, ase_notes = table_from_summary_grid(summary_grid)
     story.append(table)
 
@@ -562,6 +138,7 @@ def create_pdf(
 
     story.append(PageBreak())
 
+    ### STORY SUMMARY
     with open(folder.joinpath('grids_info.json')) as json_file:
         grids_info = json.load(json_file)
 
@@ -573,7 +150,7 @@ def create_pdf(
         if room.story in rooms_by_story:
             rooms_by_story[room.story].append(room)
     for story_id, rooms in rooms_by_story.items():
-        story.append(Paragraph(story_id, style=styles['h1']))
+        story.append(Paragraph(story_id, style=STYLES['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         horiz_bounds = [room.horizontal_boundary() for room in rooms]
@@ -701,37 +278,9 @@ def create_pdf(
                     hrs_above_drawing_pf.add(line)
 
         floor_sda = floor_area_passing_sda / floor_area * 100
-        floor_ase = floor_area_passing_ase / floor_area * 100
+        floor_ase = 100 - (floor_area_passing_ase / floor_area * 100)
 
-        _sda_table = Table(data=[[Paragraph(f'sDA: {round(floor_sda, 2)}%', style=styles['h2_c'])]], rowHeights=[16*mm])
-        table_style = TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-        ])
-        table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(floor_sda))
-        _sda_table.setStyle(table_style)
-
-        _ase_table = Table(data=[[Paragraph(f'ASE: {round(floor_ase, 2)}%', style=styles['h2_c'])]], rowHeights=[16*mm])
-        table_style = TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-        ])
-        table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(floor_ase))
-        _ase_table.setStyle(table_style)
-        table_style = TableStyle([
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-        ])
-
-        colWidths = [doc.width*0.45, doc.width*0.10, doc.width*0.45]
-        _metric_table = Table(data=[[_sda_table, '',_ase_table]], colWidths=colWidths)
-        _metric_table.setStyle(table_style)
+        _metric_table = create_metric_table(doc, round(floor_sda, 2), round(floor_ase, 2))
         story.append(_metric_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
@@ -745,7 +294,7 @@ def create_pdf(
             story.append(Spacer(width=0*cm, height=0.5*cm))
             story.append(ase_note)
 
-        section_header = Paragraph('Daylight Autonomy', style=styles['h2'])
+        section_header = Paragraph('Daylight Autonomy', style=STYLES['h2'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -799,7 +348,7 @@ def create_pdf(
         story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Daylight Autonomy | Pass / Fail', style=styles['h2'])
+        section_header = Paragraph('Daylight Autonomy | Pass / Fail', style=STYLES['h2'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -831,7 +380,7 @@ def create_pdf(
         story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Direct Sunlight', style=styles['h2'])
+        section_header = Paragraph('Direct Sunlight', style=STYLES['h2'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -884,7 +433,7 @@ def create_pdf(
         story.append(hrs_above_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Direct Sunlight | Pass / Fail', style=styles['h2'])
+        section_header = Paragraph('Direct Sunlight | Pass / Fail', style=STYLES['h2'])
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
         group_bounds = north_arrow_group.getBounds()
@@ -916,10 +465,10 @@ def create_pdf(
 
     # SUMMARY OF EACH GRID
     for grid_id, values in summary_grid.items():
-        story.append(Paragraph(grid_id, style=styles['h1']))
+        story.append(Paragraph(grid_id, style=STYLES['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        _sda_table = Table(data=[[Paragraph(f'sDA: {values["sda"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
+        _sda_table = Table(data=[[Paragraph(f'sDA: {values["sda"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -929,7 +478,7 @@ def create_pdf(
         table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(values["sda"]))
         _sda_table.setStyle(table_style)
 
-        _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=styles['h2_c'])]], rowHeights=[16*mm])
+        _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -965,6 +514,12 @@ def create_pdf(
         drawing_scale = 200
         drawing_width = (_width / drawing_scale) * 1000 * mm
         drawing_height = drawing_width / _ratio
+
+        ##################################
+        drawing_3d = draw_room_isometric(room, orientation=ViewOrientation.SE)
+        story.append(drawing_3d)
+        ##################################
+
         da_drawing = Drawing(drawing_width, drawing_height)
         da = np.loadtxt(run_folder.joinpath('leed-summary', 'results', 'da', f'{grid_id}.da'))
         hrs_above_drawing = Drawing(drawing_width, drawing_height)
@@ -1162,7 +717,7 @@ def create_pdf(
 
         ase_note = values.get('ase_note')
         if ase_note:
-            story.append(Paragraph(ase_note, style=styles['Normal']))
+            story.append(Paragraph(ase_note, style=STYLES['Normal']))
 
         for grid_info in grids_info:
             if grid_id == grid_info['full_id']:
@@ -1170,7 +725,7 @@ def create_pdf(
 
         light_paths = [lp[0] for lp in grid_info['light_path']]
         ap = AnalysisPeriod(st_hour=8, end_hour=17)
-        story.append(Paragraph('Aperture Groups', style=styles['h2']))
+        story.append(Paragraph('Aperture Groups', style=STYLES['h2']))
         body_text = (
             f'This section present the Aperture Groups for the space <b>{grid_id}</b>. '
             'The shading schedule of each Aperture Group is visualized in an '
@@ -1178,9 +733,12 @@ def create_pdf(
             'and <i>Shading Off</i>. The percentage of occupied hours for both '
             'states is presented in a table.'
         )
-        story.append(Paragraph(body_text, style=styles['BodyText']))
+        story.append(Paragraph(body_text, style=STYLES['BodyText']))
         for aperture_group in light_paths:
-            aperture_group_header = Paragraph(aperture_group, style=styles['h3'])
+            aperture_group_header = Paragraph(aperture_group, style=STYLES['h3'])
+
+            drawing_3d = draw_room_isometric(room, orientation=ViewOrientation.SE, dynamic_group_identifier=aperture_group)
+
             datacollection = \
                 HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
             
@@ -1229,9 +787,10 @@ def create_pdf(
                 ])
             )
             story.append(Spacer(width=0*cm, height=0.5*cm))
-            story.append(KeepTogether(flowables=[aperture_group_header, table]))
+            story.append(KeepTogether(flowables=[aperture_group_header, drawing_3d, table]))
 
         story.append(PageBreak())
+        break
 
     # Build and save the PDF
     doc.multiBuild(
