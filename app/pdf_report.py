@@ -177,9 +177,9 @@ def create_pdf(
         for room in rooms:
             for sensor_grid in sensor_grids.values():
                 if sensor_grid.room_identifier == room.identifier:
-                    floor_area += summary_grid[room.display_name]['total_floor_area']
-                    floor_area_passing_sda += summary_grid[room.display_name]['floor_area_passing_sda']
-                    floor_area_passing_ase += summary_grid[room.display_name]['floor_area_passing_ase']
+                    floor_area += summary_grid[sensor_grid.full_identifier]['total_floor_area']
+                    floor_area_passing_sda += summary_grid[sensor_grid.full_identifier]['floor_area_passing_sda']
+                    floor_area_passing_ase += summary_grid[sensor_grid.full_identifier]['floor_area_passing_ase']
                     floor_sensor_grids.append(sensor_grid.full_identifier)
 
                     mesh = sensor_grid.mesh
@@ -466,32 +466,34 @@ def create_pdf(
         story.append(PageBreak())
 
     # SUMMARY OF EACH GRID
-    for grid_id, values in summary_grid.items():
-        # get room object
+    for grid_summary in summary_grid.values():
+        grid_name = grid_summary['name']
+        grid_id = grid_summary['full_id']
         sensor_grid = sensor_grids[grid_id]
+        # get room object
         room: Room = hb_model.rooms_by_identifier([sensor_grid.room_identifier])[0]
 
-        story.append(Paragraph(grid_id, style=STYLES['h1']))
+        story.append(Paragraph(grid_name, style=STYLES['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        _sda_table = Table(data=[[Paragraph(f'sDA: {values["sda"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
+        _sda_table = Table(data=[[Paragraph(f'sDA: {grid_summary["sda"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('ROUNDEDCORNERS', [10, 10, 10, 10]),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ])
-        table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(values["sda"]))
+        table_style.add('BACKGROUND', (0, 0), (0, 0), get_sda_cell_color(grid_summary["sda"]))
         _sda_table.setStyle(table_style)
 
-        _ase_table = Table(data=[[Paragraph(f'ASE: {values["ase"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
+        _ase_table = Table(data=[[Paragraph(f'ASE: {grid_summary["ase"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
         table_style = TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('ROUNDEDCORNERS', [10, 10, 10, 10]),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ])
-        table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(values["ase"]))
+        table_style.add('BACKGROUND', (0, 0), (0, 0), get_ase_cell_color(grid_summary["ase"]))
         _ase_table.setStyle(table_style)
         table_style = TableStyle([
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
@@ -577,27 +579,29 @@ def create_pdf(
                 da_drawing.add(line)
                 hrs_above_drawing.add(line)
 
-        _da_heatmap_table = Table(data=[[da_drawing]])
-        table_style = TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-        ])
-        _da_heatmap_table.setStyle(table_style)
+        #scale_drawing_to_width(da_drawing, doc.width*0.45)
+        # _da_heatmap_table = Table(data=[[da_drawing]])
+        # table_style = TableStyle([
+        #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        # ])
+        # _da_heatmap_table.setStyle(table_style)
 
-        _hrs_above_heatmap_table = Table(data=[[hrs_above_drawing]])
-        table_style = TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-        ])
-        _hrs_above_heatmap_table.setStyle(table_style)
+        # scale_drawing_to_width(hrs_above_drawing, doc.width*0.45)
+        # _hrs_above_heatmap_table = Table(data=[[hrs_above_drawing]])
+        # table_style = TableStyle([
+        #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        # ])
+        # _hrs_above_heatmap_table.setStyle(table_style)
 
-        table_style = TableStyle([
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-        ])
-        _heatmap_table = Table(data=[[_da_heatmap_table, '', _hrs_above_heatmap_table]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        # table_style = TableStyle([
+        #     ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        #     ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        #     ('TOPPADDING', (0, 0), (-1, -1), 0),
+        #     ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        # ])
+        _heatmap_table = Table(data=[[scale_drawing_to_width(da_drawing, doc.width*0.45), '', scale_drawing_to_width(hrs_above_drawing, doc.width*0.45)]], colWidths=[doc.width*0.45, None, doc.width*0.45])
         _heatmap_table.setStyle(table_style)
         story.append(_heatmap_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -709,12 +713,48 @@ def create_pdf(
         story.append(legends_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
+        if states_schedule_err.get(grid_name, None):
+                    story.append(Paragraph('Space did not pass \'2% rule\'', style=STYLES['h2']))
+                    body_text = (
+                        'There is at least one hour where 2% of the floor area '
+                        'receives direct illuminance of 1000 lux or more. These are '
+                        'hours where no combination of blinds was able to reduce the '
+                        'direct illuminance below the target of 2% of the floor area. '
+                        'The hours are visualized in below.'
+                    )
+                    story.append(Paragraph(body_text, style=STYLES['BodyText']))
+                    figure = figure_grids(grid_name, states_schedule_err)
+                    fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
+                    pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*0.60, height=None, keep_ratio=True)
+                    pdf_table = Table([[pdf_image]])
+                    pdf_table.setStyle(
+                        TableStyle([
+                            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                            ('TOPPADDING', (0, 0), (-1, -1), 0),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+                        ])
+                    )
+                    two_pct_pf_table = Table([['', pdf_table, '']], colWidths='*')
+                    two_pct_pf_table.setStyle(
+                        TableStyle([
+                            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                            ('TOPPADDING', (0, 0), (-1, -1), 0),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTRE'),
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                        ]) 
+                    )
+                    story.append(two_pct_pf_table)
+                    story.append(Spacer(width=0*cm, height=0.5*cm))
+
         table, ase_notes = table_from_summary_grid(hb_model, summary_grid, [grid_id], add_total=False)
 
         story.append(table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        ase_note = values.get('ase_note')
+        ase_note = grid_summary.get('ase_note')
         if ase_note:
             story.append(Paragraph(ase_note, style=STYLES['Normal']))
 
@@ -722,7 +762,7 @@ def create_pdf(
             if grid_id == grid_info['full_id']:
                 break
 
-        light_paths = [lp[0] for lp in grid_info['light_path']]
+        light_paths = [elem for lp in grid_info['light_path'] for elem in lp]
         ap = AnalysisPeriod(st_hour=8, end_hour=17)
         story.append(Paragraph('Aperture Groups', style=STYLES['h2']))
         body_text = (
@@ -735,6 +775,8 @@ def create_pdf(
         story.append(Paragraph(body_text, style=STYLES['BodyText']))
 
         for aperture_group in light_paths:
+            if aperture_group == '__static_apertures__':
+                break
             aperture_group_header = Paragraph(aperture_group, style=STYLES['h3'])
 
             aperture_data = []
@@ -767,7 +809,7 @@ def create_pdf(
 
             drawing_3d = draw_room_isometric(room, orientation=ViewOrientation.SE, dynamic_group_identifier=aperture_group)
 
-            colWidths = [doc.width*(1/2), doc.width*(1/2)]
+            #colWidths = [doc.width*(1/2), doc.width*(1/2)]
             drawing_table = Table([[scale_drawing_to_height(drawing_3d, 3*cm)]])
             drawing_table.setStyle(
                 TableStyle([
@@ -780,17 +822,17 @@ def create_pdf(
                 ])
             )
 
-            table_1 = Table([[aperture_table, drawing_table]], colWidths=colWidths)
-            table_1.setStyle(
-                TableStyle([
-                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-                    ('TOPPADDING', (0, 0), (-1, -1), 0),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-                ])
-            )
+            # table_1 = Table([[aperture_table, drawing_table]], colWidths=colWidths)
+            # table_1.setStyle(
+            #     TableStyle([
+            #         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            #         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            #         ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            #         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            #         ('TOPPADDING', (0, 0), (-1, -1), 0),
+            #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+            #     ])
+            # )
 
             datacollection = \
                 HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
@@ -846,7 +888,7 @@ def create_pdf(
                 ])
             )
             story.append(Spacer(width=0*cm, height=0.5*cm))
-            story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), table_1, Spacer(width=0*cm, height=0.5*cm), table]))
+            story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
 

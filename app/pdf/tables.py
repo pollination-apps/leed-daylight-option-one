@@ -15,15 +15,16 @@ from honeybee.model import Model
 def table_from_summary_grid(model: Model, summary_grid: dict, grid_filter: list = None, add_total: bool = True):
     if grid_filter:
         summary_grid = {k: summary_grid[k] for k in grid_filter if k in summary_grid}
-    df = pd.DataFrame.from_dict(summary_grid).transpose()
+    df = pd.DataFrame.from_dict(summary_grid, orient='index')
     try:
         df = df[
-            ['ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda',
+            ['name', 'ase', 'sda', 'floor_area_passing_ase', 'floor_area_passing_sda',
             'total_floor_area']
             ]
         # rename columns
         df.rename(
             columns={
+                'name': 'Space Name',
                 'ase': 'ASE [%]',
                 'sda': 'sDA [%]',
                 'floor_area_passing_ase': f'Floor area passing ASE [{UNITS_AREA[model.units]}2]',
@@ -32,12 +33,13 @@ def table_from_summary_grid(model: Model, summary_grid: dict, grid_filter: list 
                 }, inplace=True)
     except Exception:
         df = df[
-            ['ase', 'sda', 'sensor_count_passing_ase',
+            ['name', 'ase', 'sda', 'sensor_count_passing_ase',
             'sensor_count_passing_sda', 'total_sensor_count']
             ]
         # rename columns
         df.rename(
             columns={
+                'name': 'Space Name',
                 'ase': 'ASE [%]',
                 'sda': 'sDA [%]',
                 'sensor_count_passing_ase': 'Sensor count passing ASE',
@@ -45,7 +47,6 @@ def table_from_summary_grid(model: Model, summary_grid: dict, grid_filter: list 
                 'total_sensor_count': 'Total sensor count'
             }
         )
-    df = df.rename_axis('Space Name').reset_index()
 
     ase_notes = []
     for data in summary_grid.values():
