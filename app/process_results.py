@@ -141,7 +141,8 @@ def show_errors(summary: dict, states_schedule_err: dict):
             )
 
             for grid_id in st.session_state['select_grids']:
-                figure_grids(grid_id, states_schedule_err)
+                fig = figure_grids(grid_id, states_schedule_err)
+                st.plotly_chart(fig, use_container_width=True, config=get_figure_config(grid_id))
 
 
 def process_space(summary_grid: dict, states_schedule_err: dict):

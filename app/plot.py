@@ -77,7 +77,7 @@ def figure_grids(grid_id: str, states_schedule_err: dict):
 
     fig_title = {
         'text': grid_id,
-        'y': 1,
+        'y': 0.95,
         'x': 0.5,
         'xanchor': 'center',
         'yanchor': 'top'
@@ -93,7 +93,7 @@ def figure_grids(grid_id: str, states_schedule_err: dict):
     fig.update_xaxes(showline=True, linewidth=1, linecolor="black", mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, linecolor="black", mirror=True)
 
-    st.plotly_chart(fig, use_container_width=True, config=get_figure_config(grid_id))
+    return fig
 
 
 def figure_aperture_group_schedule(aperture_group: str,
