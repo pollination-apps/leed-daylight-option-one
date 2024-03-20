@@ -1,4 +1,6 @@
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, _baseFontNameB
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, \
+    _baseFontName, _baseFontNameB
+from reportlab.lib.colors import black, blue, lightblue
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 
@@ -31,4 +33,12 @@ STYLES.add(ParagraphStyle(name='Heading2_CENTER',
                           parent=STYLES['Heading2'],
                           alignment=TA_CENTER),
            alias='h2_c'
+)
+STYLES.add(ParagraphStyle(name='Normal_URL',
+                          fontName=_baseFontName,
+                          fontSize=10,
+                          leading=12,
+                          textColor=blue,
+                          underlineColor=blue,
+                          underlineWidth=0.5)
 )

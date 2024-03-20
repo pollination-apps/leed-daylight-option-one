@@ -10,6 +10,8 @@ from pdfrw import PdfReader
 from pdfrw.buildxobj import pagexobj
 from pdfrw.toreportlab import makerl
 
+from pollination_io.interactors import Run
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -46,7 +48,7 @@ from pdf.drawings import draw_room_isometric, ViewOrientation
 
 
 def create_pdf(
-        output_file: Path, run_folder: Path, report_data: dict, create_stories: bool, pagesize: tuple = A4, left_margin: float = 1.5*cm,
+        output_file: Path, run_folder: Path, run: Run, report_data: dict, create_stories: bool, pagesize: tuple = A4, left_margin: float = 1.5*cm,
         right_margin: float = 1.5*cm, top_margin: float = 2*cm,
         bottom_margin: float = 2*cm,
     ):
@@ -891,6 +893,40 @@ def create_pdf(
             story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
+        break
+
+    if run:
+        story.append(Paragraph('Study Metadata', style=STYLES['h1']))
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+        run_url = [
+            'https://app.pollination.cloud', run.owner, 'projects',
+            run.project, 'studies', run.job_id, 'runs', run.id
+        ]
+        run_url = '/'.join(run_url)
+        study_info_data = []
+        study_info_data.append(['Owner', run.owner])
+        study_info_data.append(['Project', run.project])
+        study_info_data.append(['Started At', run.status.started_at])
+        study_info_data.append(['Finished At', run.status.finished_at])
+        text = f'<a href="{run_url}"><u>Go to study on Pollination</u></a>'
+        study_info_data.append([Paragraph(text, style=STYLES['Normal_URL'])])
+        study_info_table = Table(study_info_data)
+        story.append(study_info_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        recipe_data = []
+        recipe_data.append([Paragraph('Recipe', style=STYLES['Normal_BOLD']), Paragraph('Version', style=STYLES['Normal_BOLD'])])
+        recipe_data.append([run.recipe.name, run.recipe.tag])
+        recipe_table = Table(recipe_data)
+        story.append(recipe_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        _, input_parameters = next(run.job.runs_dataframe.input_parameters.iterrows())
+        recipe_input_data = []
+        recipe_input_data.append([Paragraph('Recipe Input', style=STYLES['Normal_BOLD']), Paragraph('Input Value', style=STYLES['Normal_BOLD'])])
+        recipe_input_data.extend([[index, value] for index, value in input_parameters.items()])
+        recipe_input_table = Table(recipe_input_data)
+        story.append(recipe_input_table)
 
     # build and save the PDF
     doc.multiBuild(
