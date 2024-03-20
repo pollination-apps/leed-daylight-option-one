@@ -1,12 +1,13 @@
 """Functions to download results."""
 import streamlit as st
 
-from pollination_streamlit.interactors import Run
+#from pollination_streamlit.interactors import Run
 from pollination_streamlit.api.client import ApiClient
 from pollination_streamlit.selectors import get_api_client, run_selector
 from pollination_streamlit_io import (auth_user, select_account, select_project,
     select_study, select_run)
 from pollination_io.api.user import UserApi
+from pollination_io.interactors import Run
 
 
 def select_load_method():

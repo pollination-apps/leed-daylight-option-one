@@ -41,7 +41,7 @@ def export_report(user_api: UserApi):
         with st.spinner('Generating report...'):
             if output_file.exists():
                 output_file.unlink()
-            create_pdf(output_file, project_folder, report_data, create_stories)
+            create_pdf(output_file, project_folder, st.session_state['run'], report_data, create_stories)
 
     if output_file.exists():
         with open(output_file, 'rb') as pdf_file:
