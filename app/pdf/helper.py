@@ -94,3 +94,10 @@ def drawing_dimensions_from_bounds(drawing: Drawing):
     drawing_bounds = drawing.getBounds()
     drawing.width = abs(drawing_bounds[2] - drawing_bounds[0])
     drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
+
+
+def grid_info_by_full_id(grids_info: list, full_id: str):
+    """A function to return a grid information dictionary."""
+    for grid_info in grids_info:
+        if grid_info['full_id'] == full_id:
+            return grid_info
