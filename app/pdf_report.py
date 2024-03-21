@@ -64,7 +64,7 @@ def create_pdf(
         output_file, pagesize=pagesize, leftMargin=left_margin,
         rightMargin=right_margin, topMargin=top_margin,
         bottomMargin=bottom_margin, showBoundary=False, skip_pages=1,
-        start_on_skip_pages=True
+        start_on_skip_pages=True, title='LEED Daylight Option I'
     )
 
     title_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, showBoundary=0, id='title-frame')
