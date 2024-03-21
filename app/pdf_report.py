@@ -13,6 +13,7 @@ from pdfrw.toreportlab import makerl
 from pollination_io.interactors import Run
 from honeybee_radiance.writer import _unique_modifiers
 
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -154,8 +155,10 @@ def create_pdf(
     for room in hb_model.rooms:
         if room.story in rooms_by_story:
             rooms_by_story[room.story].append(room)
+
+    story.append(Paragraph("Levels", STYLES['h1']))
     for story_id, rooms in rooms_by_story.items():
-        story.append(Paragraph(story_id, style=STYLES['h1']))
+        story.append(Paragraph(story_id, style=STYLES['h2']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         horiz_bounds = [room.horizontal_boundary() for room in rooms]
@@ -299,7 +302,7 @@ def create_pdf(
             story.append(Spacer(width=0*cm, height=0.5*cm))
             story.append(ase_note)
 
-        section_header = Paragraph('Daylight Autonomy', style=STYLES['h2'])
+        section_header = Paragraph('Daylight Autonomy', style=STYLES['h3'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -353,7 +356,7 @@ def create_pdf(
         story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Daylight Autonomy | Pass / Fail', style=STYLES['h2'])
+        section_header = Paragraph('Daylight Autonomy | Pass / Fail', style=STYLES['h3'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -385,7 +388,7 @@ def create_pdf(
         story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Direct Sunlight', style=STYLES['h2'])
+        section_header = Paragraph('Direct Sunlight', style=STYLES['h3'])
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -438,7 +441,7 @@ def create_pdf(
         story.append(hrs_above_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Direct Sunlight | Pass / Fail', style=STYLES['h2'])
+        section_header = Paragraph('Direct Sunlight | Pass / Fail', style=STYLES['h3'])
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
         group_bounds = north_arrow_group.getBounds()
@@ -468,6 +471,7 @@ def create_pdf(
         story.append(hrs_above_pf_group)
         story.append(PageBreak())
 
+    story.append(Paragraph("Rooms", STYLES['h1']))
     # SUMMARY OF EACH GRID
     for grid_summary in summary_grid.values():
         grid_name = grid_summary['name']
@@ -479,7 +483,7 @@ def create_pdf(
         # get room object
         room: Room = hb_model.rooms_by_identifier([sensor_grid.room_identifier])[0]
 
-        story.append(Paragraph(grid_name, style=STYLES['h1']))
+        story.append(Paragraph(grid_name, style=STYLES['h2']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         _sda_table = Table(data=[[Paragraph(f'sDA: {grid_summary["sda"]}%', style=STYLES['h2_c'])]], rowHeights=[16*mm])
@@ -698,40 +702,40 @@ def create_pdf(
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         if states_schedule_err.get(grid_name, None):
-                    story.append(Paragraph('Space did not pass \'2% rule\'', style=STYLES['h2']))
-                    body_text = (
-                        'There is at least one hour where 2% of the floor area '
-                        'receives direct illuminance of 1000 lux or more. These are '
-                        'hours where no combination of blinds was able to reduce the '
-                        'direct illuminance below the target of 2% of the floor area. '
-                        'The hours are visualized in below.'
-                    )
-                    story.append(Paragraph(body_text, style=STYLES['BodyText']))
-                    figure = figure_grids(grid_name, states_schedule_err)
-                    fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
-                    pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*0.60, height=None, keep_ratio=True)
-                    pdf_table = Table([[pdf_image]])
-                    pdf_table.setStyle(
-                        TableStyle([
-                            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-                            ('TOPPADDING', (0, 0), (-1, -1), 0),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-                        ])
-                    )
-                    two_pct_pf_table = Table([['', pdf_table, '']], colWidths='*')
-                    two_pct_pf_table.setStyle(
-                        TableStyle([
-                            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-                            ('TOPPADDING', (0, 0), (-1, -1), 0),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTRE'),
-                            ('VALIGN', (0, 0), (-1, -1), 'TOP')
-                        ]) 
-                    )
-                    story.append(two_pct_pf_table)
-                    story.append(Spacer(width=0*cm, height=0.5*cm))
+            story.append(Paragraph('Space did not pass \'2% rule\'', style=STYLES['h3']))
+            body_text = (
+                'There is at least one hour where 2% of the floor area '
+                'receives direct illuminance of 1000 lux or more. These are '
+                'hours where no combination of blinds was able to reduce the '
+                'direct illuminance below the target of 2% of the floor area. '
+                'The hours are visualized in below.'
+            )
+            story.append(Paragraph(body_text, style=STYLES['BodyText']))
+            figure = figure_grids(grid_name, states_schedule_err)
+            fig_pdf = figure.to_image(format='pdf', width=700, height=350, scale=3)
+            pdf_image =  PdfImage(BytesIO(fig_pdf), width=doc.width*0.60, height=None, keep_ratio=True)
+            pdf_table = Table([[pdf_image]])
+            pdf_table.setStyle(
+                TableStyle([
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+                ])
+            )
+            two_pct_pf_table = Table([['', pdf_table, '']], colWidths='*')
+            two_pct_pf_table.setStyle(
+                TableStyle([
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTRE'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                ]) 
+            )
+            story.append(two_pct_pf_table)
+            story.append(Spacer(width=0*cm, height=0.5*cm))
 
         table, ase_notes = table_from_summary_grid(hb_model, summary_grid, [grid_id], add_total=False)
 
@@ -772,9 +776,9 @@ def create_pdf(
 
         light_paths = [elem for lp in grid_info['light_path'] for elem in lp]
         ap = AnalysisPeriod(st_hour=8, end_hour=17)
-        story.append(Paragraph('Aperture Groups', style=STYLES['h2']))
+        story.append(Paragraph('Aperture Groups', style=STYLES['h3']))
         body_text = (
-            f'This section presents the Aperture Groups for the space <b>{grid_id}</b>. '
+            f'This section presents the Aperture Groups for the space <b>{grid_name}</b>. '
             'The shading schedule of each Aperture Group is visualized in an '
             'annual heat map. The shading schedule has two states: <i>Shading On</i> '
             'and <i>Shading Off</i>. The percentage of occupied hours for both '
@@ -785,7 +789,7 @@ def create_pdf(
         for aperture_group in light_paths:
             if aperture_group == '__static_apertures__':
                 break
-            aperture_group_header = Paragraph(aperture_group, style=STYLES['h3'])
+            aperture_group_header = Paragraph(aperture_group, style=STYLES['h4'])
 
             aperture_data = []
             aperture_data.append(
@@ -817,7 +821,6 @@ def create_pdf(
 
             drawing_3d = draw_room_isometric(room, orientation=ViewOrientation.SE, dynamic_group_identifier=aperture_group)
 
-            #colWidths = [doc.width*(1/2), doc.width*(1/2)]
             drawing_table = Table([[scale_drawing_to_height(drawing_3d, 3*cm)]])
             drawing_table.setStyle(
                 TableStyle([
@@ -829,18 +832,6 @@ def create_pdf(
                     ('VALIGN', (0, 0), (-1, -1), 'TOP')
                 ])
             )
-
-            # table_1 = Table([[aperture_table, drawing_table]], colWidths=colWidths)
-            # table_1.setStyle(
-            #     TableStyle([
-            #         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            #         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            #         ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            #         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            #         ('TOPPADDING', (0, 0), (-1, -1), 0),
-            #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-            #     ])
-            # )
 
             datacollection = \
                 HourlyContinuousCollection.from_dict(states_schedule[aperture_group])
@@ -901,7 +892,7 @@ def create_pdf(
         story.append(PageBreak())
 
     if run:
-        story.append(Paragraph('Study Metadata', style=STYLES['h1']))
+        story.append(Paragraph('Study Information', style=STYLES['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         run_url = [
