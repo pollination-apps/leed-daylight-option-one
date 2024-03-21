@@ -763,6 +763,7 @@ def create_pdf(
         modifiers_table = Table(modifiers_data)
         modifiers_table.setStyle(
             TableStyle([
+                ('LINEBELOW', (0, 0), (-1, 0), 0.2, colors.black),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), ROWBACKGROUNDS)
             ])
         )
