@@ -22,10 +22,10 @@ class MyDocTemplate(BaseDocTemplate):
                 key = 'h1-%s' % self.seq.nextf('Heading1')
                 self.canv.bookmarkPage(key)
                 self.notify('TOCEntry', (0, text, pageNum))
-            # if style == 'Heading2':
-            #     key = 'h2-%s' % self.seq.nextf('heading2')
-            #     self.canv.bookmarkPage(key)
-            #     self.notify('TOCEntry', (1, text, pageNum))
+            if style == 'Heading2':
+                key = 'h2-%s' % self.seq.nextf('heading2')
+                self.canv.bookmarkPage(key)
+                self.notify('TOCEntry', (1, text, pageNum))
 
 
 class NumberedPageCanvas(canvas.Canvas):

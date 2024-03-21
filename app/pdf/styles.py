@@ -34,6 +34,11 @@ STYLES.add(ParagraphStyle(name='Heading2_CENTER',
                           alignment=TA_CENTER),
            alias='h2_c'
 )
+STYLES.add(ParagraphStyle(name='Heading3_CENTER',
+                          parent=STYLES['Heading3'],
+                          alignment=TA_CENTER),
+           alias='h3_c'
+)
 STYLES.add(ParagraphStyle(name='Normal_URL',
                           fontName=_baseFontName,
                           fontSize=10,
