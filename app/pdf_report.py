@@ -39,7 +39,7 @@ from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 from pdf.helper import scale_drawing, scale_drawing_to_width, scale_drawing_to_height, \
     create_north_arrow, draw_north_arrow, translate_group_relative, \
-    drawing_dimensions_from_bounds, UNITS_AREA, ROWBACKGROUNDS
+    drawing_dimensions_from_bounds, UNITS_AREA, ROWBACKGROUNDS, grid_info_by_full_id
 from pdf.flowables import PdfImage
 from pdf.template import MyDocTemplate, NumberedPageCanvas, _header_and_footer
 from pdf.styles import STYLES
@@ -472,6 +472,9 @@ def create_pdf(
     for grid_summary in summary_grid.values():
         grid_name = grid_summary['name']
         grid_id = grid_summary['full_id']
+
+        grid_info = grid_info_by_full_id(grids_info, grid_id)
+
         sensor_grid = sensor_grids[grid_id]
         # get room object
         room: Room = hb_model.rooms_by_identifier([sensor_grid.room_identifier])[0]
@@ -582,28 +585,6 @@ def create_pdf(
                 da_drawing.add(line)
                 hrs_above_drawing.add(line)
 
-        #scale_drawing_to_width(da_drawing, doc.width*0.45)
-        # _da_heatmap_table = Table(data=[[da_drawing]])
-        # table_style = TableStyle([
-        #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-        # ])
-        # _da_heatmap_table.setStyle(table_style)
-
-        # scale_drawing_to_width(hrs_above_drawing, doc.width*0.45)
-        # _hrs_above_heatmap_table = Table(data=[[hrs_above_drawing]])
-        # table_style = TableStyle([
-        #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        #     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-        # ])
-        # _hrs_above_heatmap_table.setStyle(table_style)
-
-        # table_style = TableStyle([
-        #     ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        #     ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        #     ('TOPPADDING', (0, 0), (-1, -1), 0),
-        #     ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-        # ])
         _heatmap_table = Table(data=[[scale_drawing_to_width(da_drawing, doc.width*0.45), '', scale_drawing_to_width(hrs_above_drawing, doc.width*0.45)]], colWidths=[doc.width*0.45, None, doc.width*0.45])
         _heatmap_table.setStyle(table_style)
         story.append(_heatmap_table)
@@ -788,15 +769,11 @@ def create_pdf(
         story.append(modifiers_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        for grid_info in grids_info:
-            if grid_id == grid_info['full_id']:
-                break
-
         light_paths = [elem for lp in grid_info['light_path'] for elem in lp]
         ap = AnalysisPeriod(st_hour=8, end_hour=17)
         story.append(Paragraph('Aperture Groups', style=STYLES['h2']))
         body_text = (
-            f'This section present the Aperture Groups for the space <b>{grid_id}</b>. '
+            f'This section presents the Aperture Groups for the space <b>{grid_id}</b>. '
             'The shading schedule of each Aperture Group is visualized in an '
             'annual heat map. The shading schedule has two states: <i>Shading On</i> '
             'and <i>Shading Off</i>. The percentage of occupied hours for both '
@@ -921,11 +898,11 @@ def create_pdf(
             story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
-        #break
 
     if run:
         story.append(Paragraph('Study Metadata', style=STYLES['h1']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
+
         run_url = [
             'https://app.pollination.cloud', run.owner, 'projects',
             run.project, 'studies', run.job_id, 'runs', run.id
@@ -955,6 +932,16 @@ def create_pdf(
         recipe_input_data.extend([[index, value] for index, value in input_parameters.items()])
         recipe_input_table = Table(recipe_input_data)
         story.append(recipe_input_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+        story.append(PageBreak())
+
+    story.append(Paragraph('Radiance Modifiers', style=STYLES['h2']))
+    geometry_objects = ()
+    geometry_objects = hb_model.faces + hb_model.apertures + hb_model.shades + hb_model.doors + list(hb_model.shade_meshes)
+    modifiers = _unique_modifiers(geometry_objects)
+    for modifier in modifiers:
+        story.append(Paragraph(modifier.to_radiance().replace('\n', '<br />\n')))
+        story.append(Spacer(width=0*cm, height=0.5*cm))
 
     # build and save the PDF
     doc.multiBuild(
