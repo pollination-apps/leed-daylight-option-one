@@ -11,6 +11,7 @@ from pdfrw.buildxobj import pagexobj
 from pdfrw.toreportlab import makerl
 
 from pollination_io.interactors import Run
+from honeybee_radiance.writer import _unique_modifiers
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -32,7 +33,7 @@ from ladybug.datacollection import HourlyContinuousCollection
 from ladybug.color import Colorset, ColorRange
 from ladybug.legend import Legend, LegendParameters
 from honeybee.model import Model, Room
-from honeybee_radiance.modifier.material.glass import Glass
+from honeybee_radiance.modifier.material import Glass, Plastic
 
 from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
@@ -759,6 +760,33 @@ def create_pdf(
         ase_note = grid_summary.get('ase_note')
         if ase_note:
             story.append(Paragraph(ase_note, style=STYLES['Normal']))
+            story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        geometry_objects = room.faces + room.apertures + room.doors + tuple(room.shades)
+        modifiers = _unique_modifiers(geometry_objects)
+        modifiers_data = []
+        modifiers_data.append([
+            Paragraph('Modifier', style=STYLES['Normal_BOLD']),
+            Paragraph('Reflectance', style=STYLES['Normal_BOLD']),
+            Paragraph('Transmittance', style=STYLES['Normal_BOLD'])
+        ])
+        for modifier in modifiers:
+            if isinstance(modifier, Plastic):
+                modifiers_data.append([
+                    modifier.display_name, round(modifier.average_reflectance, 2), 'N/A'
+                ])
+            elif isinstance(modifier, Glass):
+                modifiers_data.append([
+                    modifier.display_name, 'N/A', round(modifier.average_transmittance, 2)
+                ])
+        modifiers_table = Table(modifiers_data)
+        modifiers_table.setStyle(
+            TableStyle([
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), ROWBACKGROUNDS)
+            ])
+        )
+        story.append(modifiers_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
 
         for grid_info in grids_info:
             if grid_id == grid_info['full_id']:
@@ -893,7 +921,7 @@ def create_pdf(
             story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
-        break
+        #break
 
     if run:
         story.append(Paragraph('Study Metadata', style=STYLES['h1']))
