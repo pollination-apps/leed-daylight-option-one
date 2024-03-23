@@ -96,3 +96,34 @@ class PdfImage(Flowable):
         canv.scale(xscale, yscale)
         canv.doForm(xobj_name)
         canv.restoreState()
+
+
+class CentrePadder(Flowable):
+    '''wrap a single flowable so that its first bit will be
+    padded to fill out the space so that it appears at the
+    centre of its frame'''
+    def __init__(self,f):
+        self.__dict__['_CentrePadder__f'] = f
+
+    def wrap(self,aW,aH):
+        w,h = self.__f.wrap(aW,aH)
+        self.__dict__['_CentrePadder__dh'] = aH-h
+        return w,h
+
+    def split(self,aW,aH):
+        S = self.__f.split(aW,aH)
+        if len(S)>1:
+            S[0] = CentrePadder(S[0])
+        return S
+
+    def drawOn(self, canvas, x, y, _sW=0):
+        self.__f.drawOn(canvas,x,y-max(0,(self.__dh-1e-8)*0.5),_sW)
+
+    def __setattr__(self,a,v):
+        setattr(self.__f,a,v)
+
+    def __getattr__(self,a):
+        return getattr(self.__f,a)
+
+    def __delattr__(self,a):
+        delattr(self.__f,a)
