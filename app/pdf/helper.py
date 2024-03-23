@@ -2,7 +2,7 @@ from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing, Circle, Polygon, PolyLine, Group
 
 
-UNITS_AREA = {
+UNITS_ABBREVIATIONS = {
     'Meters': 'm',
     'Millimeters': 'mm',
     'Feet': 'ft',
@@ -17,7 +17,7 @@ ROWBACKGROUNDS = [
 ]
 
 
-def scale_drawing(drawing: Drawing, sx: float, sy: float):
+def scale_drawing(drawing: Drawing, sx: float, sy: float) -> Drawing:
     new_drawing = drawing.copy()
     new_drawing.scale(sx, sy)
     new_drawing.width = new_drawing.width * sx
@@ -25,7 +25,7 @@ def scale_drawing(drawing: Drawing, sx: float, sy: float):
     return new_drawing
 
 
-def scale_drawing_to_width(drawing: Drawing, width: float):
+def scale_drawing_to_width(drawing: Drawing, width: float) -> Drawing:
     new_drawing = drawing.copy()
     x1, y1, x2, y2 = new_drawing.getBounds()
     contents_width = x2 - x1
@@ -38,7 +38,7 @@ def scale_drawing_to_width(drawing: Drawing, width: float):
     return new_drawing
 
 
-def scale_drawing_to_height(drawing: Drawing, height: float):
+def scale_drawing_to_height(drawing: Drawing, height: float) -> Drawing:
     new_drawing = drawing.copy()
     x1, y1, x2, y2 = new_drawing.getBounds()
     contents_width = x2 - x1
@@ -96,7 +96,7 @@ def drawing_dimensions_from_bounds(drawing: Drawing):
     drawing.height = abs(drawing_bounds[3] - drawing_bounds[1])
 
 
-def grid_info_by_full_id(grids_info: list, full_id: str):
+def grid_info_by_full_id(grids_info: list, full_id: str) -> dict:
     """A function to return a grid information dictionary."""
     for grid_info in grids_info:
         if grid_info['full_id'] == full_id:

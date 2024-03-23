@@ -4,7 +4,7 @@ from reportlab.lib import colors
 from reportlab.platypus import Paragraph, Table, TableStyle
 from reportlab.lib.units import mm
 
-from pdf.helper import ROWBACKGROUNDS, UNITS_AREA
+from pdf.helper import ROWBACKGROUNDS, UNITS_ABBREVIATIONS
 from pdf.styles import STYLES
 from pdf.colors import get_ase_cell_color, get_sda_cell_color
 from pdf.template import MyDocTemplate
@@ -27,9 +27,9 @@ def table_from_summary_grid(model: Model, summary_grid: dict, grid_filter: list 
                 'name': 'Space Name',
                 'ase': 'ASE [%]',
                 'sda': 'sDA [%]',
-                'floor_area_passing_ase': f'Floor area passing ASE [{UNITS_AREA[model.units]}2]',
-                'floor_area_passing_sda': f'Floor area passing sDA [{UNITS_AREA[model.units]}2]',
-                'total_floor_area': f'Total floor area [{UNITS_AREA[model.units]}2]'
+                'floor_area_passing_ase': f'Floor area passing ASE [{UNITS_ABBREVIATIONS[model.units]}2]',
+                'floor_area_passing_sda': f'Floor area passing sDA [{UNITS_ABBREVIATIONS[model.units]}2]',
+                'total_floor_area': f'Total floor area [{UNITS_ABBREVIATIONS[model.units]}2]'
                 }, inplace=True)
     except Exception:
         df = df[
@@ -52,19 +52,21 @@ def table_from_summary_grid(model: Model, summary_grid: dict, grid_filter: list 
     for data in summary_grid.values():
         if 'ase_note' in data:
             ase_notes.append('1)')
+            df.loc[df['Space Name'] == data['name'], 'ASE Note'] = '1)'
         else:
             ase_notes.append('')
-    if not all(n=='' for n in ase_notes):
-        df['ASE Note'] = ase_notes
+            df.loc[df['Space Name'] == data['name'], 'ASE Note'] = ''
+    # if not all(n=='' for n in ase_notes):
+    #     df['ASE Note'] = ase_notes
 
     if add_total:
         total_row = [
             Paragraph('Total'),
             Paragraph(''),
             Paragraph(''),
-            Paragraph(str(round(df[f'Floor area passing ASE [{UNITS_AREA[model.units]}2]'].sum(), 2))),
-            Paragraph(str(round(df[f'Floor area passing sDA [{UNITS_AREA[model.units]}2]'].sum(), 2))),
-            Paragraph(str(round(df[f'Total floor area [{UNITS_AREA[model.units]}2]'].sum(), 2))),
+            Paragraph(str(round(df[f'Floor area passing ASE [{UNITS_ABBREVIATIONS[model.units]}2]'].sum(), 2))),
+            Paragraph(str(round(df[f'Floor area passing sDA [{UNITS_ABBREVIATIONS[model.units]}2]'].sum(), 2))),
+            Paragraph(str(round(df[f'Total floor area [{UNITS_ABBREVIATIONS[model.units]}2]'].sum(), 2))),
             Paragraph('')
         ]
     df = df.astype(str)
