@@ -44,7 +44,7 @@ from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 from pdf.helper import scale_drawing, scale_drawing_to_width, scale_drawing_to_height, \
     create_north_arrow, draw_north_arrow, translate_group_relative, \
     drawing_dimensions_from_bounds, UNITS_ABBREVIATIONS, ROWBACKGROUNDS, grid_info_by_full_id
-from pdf.flowables import PdfImage
+from pdf.flowables import PdfImage, CentrePadder
 from pdf.template import MyDocTemplate, NumberedPageCanvas, _header_and_footer
 from pdf.styles import STYLES
 from pdf.tables import table_from_summary_grid, create_metric_table
@@ -435,7 +435,7 @@ def create_pdf(
         story.append(da_pf_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Direct Sunlight', style=STYLES['h3'])
+        story.append(Paragraph('Direct Sunlight', style=STYLES['h3']))
         body_text = (
             'The Direct Sunlight is the number of occupied hours where the '
             'direct illuminance is larger than 1000 lux. It is calculated in a '
@@ -492,7 +492,7 @@ def create_pdf(
         legend_north_drawing.add(group)
         drawing_dimensions_from_bounds(legend_north_drawing)
         hrs_above_drawing = scale_drawing_to_width(hrs_above_drawing, doc.width)
-        hrs_above_group = KeepTogether(flowables=[section_header, hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        hrs_above_group = KeepTogether(flowables=[hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(hrs_above_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
