@@ -12,6 +12,8 @@ from pdfrw.toreportlab import makerl
 
 from pollination_io.interactors import Run
 from honeybee_radiance.writer import _unique_modifiers
+from ladybug.epw import EPW
+from ladybug.wea import Wea
 
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import A4
@@ -23,10 +25,10 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, _baseFontNameB
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.graphics.shapes import Drawing, Circle, Rect, Polygon, Line, PolyLine, Group, String
-from reportlab.graphics.widgets.adjustableArrow import AdjustableArrow
 from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Paragraph, \
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
-    Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether
+    Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether, TopPadder, \
+    UseUpSpace, AnchorFlowable
 from reportlab.platypus.tableofcontents import TableOfContents
 
 from ladybug.analysisperiod import AnalysisPeriod
@@ -34,13 +36,14 @@ from ladybug.datacollection import HourlyContinuousCollection
 from ladybug.color import Colorset, ColorRange
 from ladybug.legend import Legend, LegendParameters
 from honeybee.model import Model, Room
+from honeybee.units import conversion_factor_to_meters, parse_distance_string
 from honeybee_radiance.modifier.material import Glass, Plastic
 
 from results import load_from_folder
 from plot import figure_grids, figure_aperture_group_schedule, figure_ase
 from pdf.helper import scale_drawing, scale_drawing_to_width, scale_drawing_to_height, \
     create_north_arrow, draw_north_arrow, translate_group_relative, \
-    drawing_dimensions_from_bounds, UNITS_AREA, ROWBACKGROUNDS, grid_info_by_full_id
+    drawing_dimensions_from_bounds, UNITS_ABBREVIATIONS, ROWBACKGROUNDS, grid_info_by_full_id
 from pdf.flowables import PdfImage
 from pdf.template import MyDocTemplate, NumberedPageCanvas, _header_and_footer
 from pdf.styles import STYLES
@@ -83,18 +86,37 @@ def create_pdf(
     doc.addPageTemplates(title_page_template)
     doc.addPageTemplates(base_template)
 
+    if run:
+        _, input_artifacts = next(run.job.runs_dataframe.input_artifacts.iterrows())
+        _bytes = run.job.download_artifact(input_artifacts.wea)
+        weather_file = run_folder.joinpath('weather.wea')
+        with open(weather_file, 'wb') as f:
+            f.write(_bytes.getbuffer())
+        with open(weather_file) as inf:
+            first_word = inf.read(5)
+        is_wea = True if first_word == 'place' else False
+        if not is_wea:
+            wea = Wea.from_epw_file(weather_file)
+        else:
+            wea = Wea.from_file(weather_file)
+
     story = []
 
     ### TITLE PAGE
-    front_page_table = Table(
-        [
+    front_page_data = [
             [Paragraph('LEED Daylight Option I Report', STYLES['h1_c'])],
             [Paragraph(f'Project: {report_data["project"]}', STYLES['h2_c'])],
-            [],
-            [Paragraph(f'Prepared by: {report_data["prepared_by"]}', STYLES['Normal_CENTER'])],
-            [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}', STYLES['Normal_CENTER'])]
-        ]
-    )
+    ]
+    if run:
+        front_page_data.append([
+            Paragraph(f'Location: {wea.location.city}', STYLES['h2_c'])
+        ])
+    front_page_data.append([])
+    front_page_data.extend([
+        [Paragraph(f'Prepared by: {report_data["prepared_by"]}', STYLES['Normal_CENTER'])],
+        [Paragraph(f'Date created: {datetime.datetime.today().strftime("%B %d, %Y")}', STYLES['Normal_CENTER'])]
+    ])
+    front_page_table = Table(front_page_data)
     host_table = Table(
         [[front_page_table]], colWidths=[doc.width]
     )
@@ -156,7 +178,7 @@ def create_pdf(
         if room.story in rooms_by_story:
             rooms_by_story[room.story].append(room)
 
-    story.append(Paragraph("Levels", STYLES['h1']))
+    story.append(Paragraph('Levels Summary', STYLES['h1']))
     for story_id, rooms in rooms_by_story.items():
         story.append(Paragraph(story_id, style=STYLES['h2']))
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -169,7 +191,7 @@ def create_pdf(
         _height = rooms_max.y - rooms_min.y
         _ratio = _width / _height
         drawing_scale = 200
-        drawing_width = (_width / drawing_scale) * 1000 * mm
+        drawing_width = parse_distance_string(f'{_width / drawing_scale}{UNITS_ABBREVIATIONS[hb_model.units]}', destination_units='Millimeters') * mm
         drawing_height = drawing_width / _ratio
         da_drawing = Drawing(drawing_width, drawing_height)
         da_drawing_pf = Drawing(drawing_width, drawing_height)
@@ -199,6 +221,10 @@ def create_pdf(
                     for face, face_centroid, _da, _hrs in zip(faces, faces_centroids, da, hrs_above):
                         vertices = [mesh.vertices[i] for i in face]
                         points = []
+                        max_x = float('-inf')
+                        min_x = float('inf')
+                        max_y = float('-inf')
+                        min_y = float('inf')
                         for vertex in vertices:
                             points.extend(
                                 [
@@ -206,7 +232,17 @@ def create_pdf(
                                     np.interp(vertex.y, [rooms_min.y, rooms_max.y], [0, drawing_height])
                                 ]
                             )
+                            if vertex.x > max_x:
+                                max_x = vertex.x
+                            if vertex.x < min_x:
+                                min_x = vertex.x
+                            if vertex.y > max_y:
+                                max_y = vertex.y
+                            if vertex.y < min_y:
+                                min_y = vertex.y
 
+                        circle_size = min([max_x - min_x, max_y - min_y])
+                        circle_size_mm = parse_distance_string(f'{circle_size}{UNITS_ABBREVIATIONS[hb_model.units]}', destination_units='Millimeters')
                         lb_color =  da_color_range.color(_da)
                         fillColor = colors.Color(lb_color.r / 255, lb_color.g / 255, lb_color.b / 255)
                         polygon = Polygon(points=points, fillColor=fillColor, strokeWidth=0, strokeColor=fillColor)
@@ -219,7 +255,7 @@ def create_pdf(
                         circle = Circle(
                             np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
                             np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
-                            ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
+                            (circle_size_mm * mm / 2) * 0.85  / drawing_scale,
                             fillColor=fillColor,
                             strokeWidth=0,
                             strokeOpacity=0
@@ -243,13 +279,14 @@ def create_pdf(
                         polygon = Circle(
                             np.interp(face_centroid.x, [rooms_min.x, rooms_max.x], [0, drawing_width]),
                             np.interp(face_centroid.y, [rooms_min.y, rooms_max.y], [0, drawing_height]),
-                            ((2 * 250 * mm) / 2 ) * 0.85 / drawing_scale,
+                            (circle_size_mm * mm / 2) * 0.85 / drawing_scale,
                             fillColor=fillColor,
                             strokeWidth=0,
                             strokeOpacity=0
                         )
                         hrs_above_drawing_pf.add(polygon)
 
+            # add room boundary Polygon
             horiz_bound = room.horizontal_boundary()
             horiz_bound_vertices = horiz_bound.vertices
             points = []
@@ -302,7 +339,17 @@ def create_pdf(
             story.append(Spacer(width=0*cm, height=0.5*cm))
             story.append(ase_note)
 
-        section_header = Paragraph('Daylight Autonomy', style=STYLES['h3'])
+        story.append(PageBreak())
+        story.append(Paragraph('Daylight Autonomy', style=STYLES['h3']))
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+        body_text = (
+            'The Daylight Autonomy is the percentage of occupied hours where '
+            'the illuminance is 300 lux or higher. It is calculated based on '
+            'shading schedules for each Aperture Group. The detailed shading '
+            'schedules are visualized under each Room summary.'
+        )
+        story.append(Paragraph(body_text, style=STYLES['BodyText']))
+        story.append(Spacer(width=0*cm, height=0.5*cm))
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -352,7 +399,7 @@ def create_pdf(
         legend_north_drawing.add(group)
         drawing_dimensions_from_bounds(legend_north_drawing)
         da_drawing = scale_drawing_to_width(da_drawing, doc.width)
-        da_group = KeepTogether(flowables=[section_header, da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
+        da_group = KeepTogether(flowables=[da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
         story.append(da_group)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
@@ -389,6 +436,14 @@ def create_pdf(
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         section_header = Paragraph('Direct Sunlight', style=STYLES['h3'])
+        body_text = (
+            'The Direct Sunlight is the number of occupied hours where the '
+            'direct illuminance is larger than 1000 lux. It is calculated in a '
+            'static state without use of shading schedules for each Aperture '
+            'Group.'
+        )
+        story.append(Paragraph(body_text, style=STYLES['BodyText']))
+        story.append(Spacer(width=0*cm, height=0.5*cm))
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -471,7 +526,7 @@ def create_pdf(
         story.append(hrs_above_pf_group)
         story.append(PageBreak())
 
-    story.append(Paragraph("Rooms", STYLES['h1']))
+    story.append(Paragraph("Rooms Summary", STYLES['h1']))
     # SUMMARY OF EACH GRID
     for grid_summary in summary_grid.values():
         grid_name = grid_summary['name']
@@ -528,7 +583,7 @@ def create_pdf(
         _height = room_max.y - room_min.y
         _ratio = _width / _height
         drawing_scale = 200
-        drawing_width = (_width / drawing_scale) * 1000 * mm
+        drawing_width = parse_distance_string(f'{_width / drawing_scale}{UNITS_ABBREVIATIONS[hb_model.units]}', destination_units='Millimeters') * mm
         drawing_height = drawing_width / _ratio
 
         da_drawing = Drawing(drawing_width, drawing_height)
@@ -795,7 +850,7 @@ def create_pdf(
             aperture_data.append(
                 [
                     Paragraph('Name', style=STYLES['Normal_BOLD']),
-                    Paragraph(f'Area [{UNITS_AREA[hb_model.units]}2]', style=STYLES['Normal_BOLD']),
+                    Paragraph(f'Area [{UNITS_ABBREVIATIONS[hb_model.units]}2]', style=STYLES['Normal_BOLD']),
                     Paragraph('Transmittance', style=STYLES['Normal_BOLD'])
                 ]
             )
@@ -887,9 +942,10 @@ def create_pdf(
                 ])
             )
             story.append(Spacer(width=0*cm, height=0.5*cm))
-            story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
+            story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, Spacer(width=0*cm, height=0.5*cm), aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
+        break
 
     if run:
         story.append(Paragraph('Study Information', style=STYLES['h1']))
@@ -909,6 +965,25 @@ def create_pdf(
         study_info_data.append([Paragraph(text, style=STYLES['Normal_URL'])])
         study_info_table = Table(study_info_data)
         story.append(study_info_table)
+        story.append(Spacer(width=0*cm, height=0.5*cm))
+
+        weather_data = []
+        weather_data.append(
+            [
+                Paragraph('Location', style=STYLES['Normal_BOLD']),
+                Paragraph('Latitude', style=STYLES['Normal_BOLD']),
+                Paragraph('Longitude', style=STYLES['Normal_BOLD'])
+            ]
+        )
+        weather_data.append(
+            [
+                Paragraph(wea.location.city),
+                Paragraph(f'{wea.location.latitude:.2f}'),
+                Paragraph(f'{wea.location.longitude:.2f}')
+            ]
+        )
+        weather_table = Table(weather_data)
+        story.append(weather_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
 
         recipe_data = []

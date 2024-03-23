@@ -1,11 +1,12 @@
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, \
     _baseFontName, _baseFontNameB
-from reportlab.lib.colors import black, blue, lightblue
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.colors import blue
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_JUSTIFY
 
 
 STYLES = getSampleStyleSheet()
 STYLES['BodyText'].leading = 18
+STYLES['BodyText'].alignment = TA_JUSTIFY
 STYLES.add(ParagraphStyle(name='Normal_BOLD',
                           parent=STYLES['Normal'],
                           fontSize=10,
