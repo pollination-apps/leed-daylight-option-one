@@ -1,5 +1,6 @@
 """Pollination LEED Daylight Option I App."""
 import streamlit as st
+from packaging import version
 
 from pollination_streamlit_viewer import viewer
 
@@ -58,7 +59,16 @@ def main():
             viewer(content=vtjks_file.read_bytes(), key='viz')
 
         with report_tab:
-            export_report(user_api)
+            if st.session_state['load_method'] == 'Try the sample run':
+                export_report(user_api)
+            elif version.parse(st.session_state.run.recipe.tag) > version.parse('0.0.28'):
+                export_report(user_api)
+            else:
+                st.error(
+                    'Only versions pollination/leed-daylight-option-one:0.0.28 '
+                    'are able to generate a PDF report. The version used in your '
+                    f'study is: {st.session_state.run.recipe.tag}.'
+                )
     else:
         for tab in (summary_tab, states_schedule_tab, dir_ill_tab,
                     visualization_tab, report_tab):
