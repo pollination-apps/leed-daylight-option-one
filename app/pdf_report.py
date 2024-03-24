@@ -644,7 +644,14 @@ def create_pdf(
                 da_drawing.add(line)
                 hrs_above_drawing.add(line)
 
-        _heatmap_table = Table(data=[[scale_drawing_to_width(da_drawing, doc.width*0.45), '', scale_drawing_to_width(hrs_above_drawing, doc.width*0.45)]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        _heatmap_table = Table(data=[[scale_drawing_to_width(da_drawing, doc.width*0.45, max_height=60*mm), '', scale_drawing_to_width(hrs_above_drawing, doc.width*0.45, max_height=60*mm)]], colWidths=[doc.width*0.45, None, doc.width*0.45])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
         _heatmap_table.setStyle(table_style)
         story.append(_heatmap_table)
         story.append(Spacer(width=0*cm, height=0.5*cm))
@@ -945,7 +952,6 @@ def create_pdf(
             story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, Spacer(width=0*cm, height=0.5*cm), aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
-        break
 
     if run:
         story.append(Paragraph('Study Information', style=STYLES['h1']))
