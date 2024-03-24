@@ -25,28 +25,36 @@ def scale_drawing(drawing: Drawing, sx: float, sy: float) -> Drawing:
     return new_drawing
 
 
-def scale_drawing_to_width(drawing: Drawing, width: float) -> Drawing:
+def scale_drawing_to_width(drawing: Drawing, width: float, max_height: float = None) -> Drawing:
     new_drawing = drawing.copy()
     x1, y1, x2, y2 = new_drawing.getBounds()
     contents_width = x2 - x1
     contents_height = y2 - y1
     scale_factor = width / contents_width
-    new_height = contents_height * scale_factor
+    height = contents_height * scale_factor
+    if max_height is not None and height > max_height:
+        scale_factor = max_height / contents_height
+        width = contents_width * scale_factor
+        height = max_height
     new_drawing.scale(sx=scale_factor, sy=scale_factor)
     new_drawing.width = width
-    new_drawing.height = new_height
+    new_drawing.height = height
     return new_drawing
 
 
-def scale_drawing_to_height(drawing: Drawing, height: float) -> Drawing:
+def scale_drawing_to_height(drawing: Drawing, height: float, max_width: float = None) -> Drawing:
     new_drawing = drawing.copy()
     x1, y1, x2, y2 = new_drawing.getBounds()
     contents_width = x2 - x1
     contents_height = y2 - y1
     scale_factor = height / contents_height
-    new_width = contents_width * scale_factor
+    width = contents_width * scale_factor
+    if max_width is not None and width > max_width:
+        scale_factor = max_width / contents_width
+        width = max_width
+        height = contents_height * scale_factor
     new_drawing.scale(sx=scale_factor, sy=scale_factor)
-    new_drawing.width = new_width
+    new_drawing.width = width
     new_drawing.height = height
     return new_drawing
 
