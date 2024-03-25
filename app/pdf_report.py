@@ -28,7 +28,7 @@ from reportlab.graphics.shapes import Drawing, Circle, Rect, Polygon, Line, Poly
 from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, Flowable, Paragraph, \
     Table, TableStyle, PageTemplate, Frame, PageBreak, NextPageTemplate, \
     Image, FrameBreak, Spacer, HRFlowable, CondPageBreak, KeepTogether, TopPadder, \
-    UseUpSpace, AnchorFlowable
+    UseUpSpace, AnchorFlowable, KeepInFrame
 from reportlab.platypus.tableofcontents import TableOfContents
 
 from ladybug.analysisperiod import AnalysisPeriod
@@ -77,10 +77,12 @@ def create_pdf(
     footer_content = Paragraph('LEED Daylight Option I', STYLES['Normal'])
     pollination_image = st.session_state.target_folder.joinpath('assets', 'images', 'pollination.png')
     title_page_template = PageTemplate(id='title-page', frames=[title_frame], pagesize=pagesize)
+    base_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height,
+                       id='base-frame', leftPadding=0, bottomPadding=0,
+                       rightPadding=0, topPadding=0)
     base_template = PageTemplate(
         'base',
-        [Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='base-frame',
-               leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0)],
+        [base_frame],
         onPage=partial(_header_and_footer, header_content=header_content, footer_content=footer_content, logo=pollination_image)
     )
     doc.addPageTemplates(title_page_template)
@@ -340,16 +342,17 @@ def create_pdf(
             story.append(ase_note)
 
         story.append(PageBreak())
-        story.append(Paragraph('Daylight Autonomy', style=STYLES['h3']))
-        story.append(Spacer(width=0*cm, height=0.5*cm))
+        section_story = []
+        section_story.append(Paragraph('Daylight Autonomy', style=STYLES['h3']))
         body_text = (
             'The Daylight Autonomy is the percentage of occupied hours where '
-            'the illuminance is 300 lux or higher. It is calculated based on '
-            'shading schedules for each Aperture Group. The detailed shading '
+            'the illuminance is 300 lux or higher. The average <b>sDA</b> for this '
+            f'level is: <b>{round(floor_sda, 2)}%</b>. It is calculated based '
+            'on shading schedules for each Aperture Group. The detailed shading '
             'schedules are visualized under each Room summary.'
         )
-        story.append(Paragraph(body_text, style=STYLES['BodyText']))
-        story.append(Spacer(width=0*cm, height=0.5*cm))
+        section_story.append(Paragraph(body_text, style=STYLES['BodyText']))
+        section_story.append(Spacer(width=0*cm, height=0.5*cm))
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -398,12 +401,46 @@ def create_pdf(
         translate_group_relative(group, north_arrow_group, anchor='e', padding=5)
         legend_north_drawing.add(group)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        da_drawing = scale_drawing_to_width(da_drawing, doc.width)
-        da_group = KeepTogether(flowables=[da_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
-        story.append(da_group)
-        story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Daylight Autonomy | Pass / Fail', style=STYLES['h3'])
+        legend_north_drawing_table = Table([[legend_north_drawing]])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        legend_north_drawing_table.setStyle(table_style)
+
+        remaining_height = (base_frame._aH - sum([flowable.wrap(base_frame._aW, base_frame._aH)[1] for flowable in section_story]) - legend_north_drawing_table.wrap(base_frame._aW, base_frame._aH)[1]) * 0.98
+
+        da_drawing_table = Table([[scale_drawing_to_width(da_drawing, doc.width*0.9, max_height=remaining_height)]], rowHeights=[remaining_height])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        da_drawing_table.setStyle(table_style)
+        section_story.append(da_drawing_table)
+
+        section_story.append(legend_north_drawing_table)
+        story.append(KeepTogether(flowables=section_story))
+        story.append(PageBreak())
+
+        section_story = []
+        section_story.append(Paragraph('Daylight Autonomy | Pass / Fail', style=STYLES['h3']))
+        body_text = (
+            'The Daylight Autonomy is the percentage of occupied hours where '
+            'the illuminance is 300 lux or higher. The average <b>sDA</b> for this '
+            f'level is: <b>{round(floor_sda, 2)}%</b>. It is calculated based '
+            'on shading schedules for each Aperture Group. The detailed shading '
+            'schedules are visualized under each Room summary.'
+        )
+        section_story.append(Paragraph(body_text, style=STYLES['BodyText']))
+        section_story.append(Spacer(width=0*cm, height=0.5*cm))
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -430,20 +467,46 @@ def create_pdf(
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        da_drawing_pf = scale_drawing_to_width(da_drawing_pf, doc.width)
-        da_pf_group = KeepTogether(flowables=[section_header, da_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
-        story.append(da_pf_group)
-        story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        story.append(Paragraph('Direct Sunlight', style=STYLES['h3']))
+        legend_north_drawing_table = Table([[legend_north_drawing]])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        legend_north_drawing_table.setStyle(table_style)
+
+        remaining_height = (base_frame._aH - sum([flowable.wrap(base_frame._aW, base_frame._aH)[1] for flowable in section_story]) - legend_north_drawing_table.wrap(base_frame._aW, base_frame._aH)[1]) * 0.98
+
+        da_drawing_pf_table = Table([[scale_drawing_to_width(da_drawing_pf, doc.width*0.9, max_height=remaining_height)]], rowHeights=[remaining_height])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        da_drawing_pf_table.setStyle(table_style)
+        section_story.append(da_drawing_pf_table)
+
+        section_story.append(legend_north_drawing_table)
+        story.append(KeepTogether(flowables=section_story))
+        story.append(PageBreak())
+
+        section_story = []
+        section_story.append(Paragraph('Direct Sunlight', style=STYLES['h3']))
         body_text = (
             'The Direct Sunlight is the number of occupied hours where the '
-            'direct illuminance is larger than 1000 lux. It is calculated in a '
-            'static state without use of shading schedules for each Aperture '
-            'Group.'
+            'direct illuminance is larger than 1000 lux. The average <b>ASE</b> '
+            f'for this level is: <b>{round(floor_ase, 2)}%</b>. It is calculated '
+            'in a static state without use of shading schedules for each '
+            'Aperture Group.'
         )
-        story.append(Paragraph(body_text, style=STYLES['BodyText']))
-        story.append(Spacer(width=0*cm, height=0.5*cm))
+        section_story.append(Paragraph(body_text, style=STYLES['BodyText']))
+        section_story.append(Spacer(width=0*cm, height=0.5*cm))
 
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
@@ -491,12 +554,46 @@ def create_pdf(
         translate_group_relative(group, north_arrow_group, 'e', 5)
         legend_north_drawing.add(group)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        hrs_above_drawing = scale_drawing_to_width(hrs_above_drawing, doc.width)
-        hrs_above_group = KeepTogether(flowables=[hrs_above_drawing, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
-        story.append(hrs_above_group)
-        story.append(Spacer(width=0*cm, height=0.5*cm))
 
-        section_header = Paragraph('Direct Sunlight | Pass / Fail', style=STYLES['h3'])
+        legend_north_drawing_table = Table([[legend_north_drawing]])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        legend_north_drawing_table.setStyle(table_style)
+
+        remaining_height = (base_frame._aH - sum([flowable.wrap(base_frame._aW, base_frame._aH)[1] for flowable in section_story]) - legend_north_drawing_table.wrap(base_frame._aW, base_frame._aH)[1]) * 0.98
+
+        hrs_above_drawing_table = Table([[scale_drawing_to_width(hrs_above_drawing, doc.width*0.9, max_height=remaining_height)]], rowHeights=[remaining_height])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        hrs_above_drawing_table.setStyle(table_style)
+        section_story.append(hrs_above_drawing_table)
+
+        section_story.append(legend_north_drawing_table)
+        story.append(KeepTogether(flowables=section_story))
+        story.append(PageBreak())
+
+        section_story = []
+        section_story.append(Paragraph('Direct Sunlight | Pass / Fail', style=STYLES['h3']))
+        body_text = (
+            'The Direct Sunlight is the number of occupied hours where the '
+            'direct illuminance is larger than 1000 lux. The average <b>ASE</b> '
+            f'for this level is: <b>{round(floor_ase, 2)}%</b>. It is calculated '
+            'in a static state without use of shading schedules for each '
+            'Aperture Group.'
+        )
+        section_story.append(Paragraph(body_text, style=STYLES['BodyText']))
+        section_story.append(Spacer(width=0*cm, height=0.5*cm))
         legend_north_drawing = Drawing(0, 0)
         north_arrow_group = create_north_arrow(0, 10)
         group_bounds = north_arrow_group.getBounds()
@@ -521,9 +618,33 @@ def create_pdf(
         translate_group_relative(rectangles, north_arrow_group, 'e', 5)
         legend_north_drawing.add(rectangles)
         drawing_dimensions_from_bounds(legend_north_drawing)
-        hrs_above_drawing_pf = scale_drawing_to_width(hrs_above_drawing_pf, doc.width)
-        hrs_above_pf_group = KeepTogether(flowables=[section_header, hrs_above_drawing_pf, Spacer(width=0*cm, height=0.5*cm), legend_north_drawing])
-        story.append(hrs_above_pf_group)
+
+        legend_north_drawing_table = Table([[legend_north_drawing]])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        legend_north_drawing_table.setStyle(table_style)
+
+        remaining_height = (base_frame._aH - sum([flowable.wrap(base_frame._aW, base_frame._aH)[1] for flowable in section_story]) - legend_north_drawing_table.wrap(base_frame._aW, base_frame._aH)[1]) * 0.98
+
+        hrs_above_drawing_pf_table = Table([[scale_drawing_to_width(hrs_above_drawing_pf, doc.width*0.9, max_height=remaining_height)]], rowHeights=[remaining_height])
+        table_style = TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+        ])
+        hrs_above_drawing_pf_table.setStyle(table_style)
+        section_story.append(hrs_above_drawing_pf_table)
+
+        section_story.append(legend_north_drawing_table)
+        story.append(KeepTogether(flowables=section_story))
         story.append(PageBreak())
 
     story.append(Paragraph("Rooms Summary", STYLES['h1']))
