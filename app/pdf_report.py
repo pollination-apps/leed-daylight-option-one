@@ -1069,7 +1069,6 @@ def create_pdf(
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
                 ])
             )
-            story.append(Spacer(width=0*cm, height=0.5*cm))
             story.append(KeepTogether(flowables=[aperture_group_header, Spacer(width=0*cm, height=0.5*cm), drawing_table, Spacer(width=0*cm, height=0.5*cm), aperture_table, Spacer(width=0*cm, height=0.5*cm), table]))
 
         story.append(PageBreak())
