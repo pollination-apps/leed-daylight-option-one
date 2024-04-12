@@ -6,9 +6,6 @@ import json
 import numpy as np
 from io import BytesIO
 import datetime
-from pdfrw import PdfReader
-from pdfrw.buildxobj import pagexobj
-from pdfrw.toreportlab import makerl
 
 from pollination_io.interactors import Run
 from honeybee_radiance.writer import _unique_modifiers
