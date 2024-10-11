@@ -105,7 +105,22 @@ def figure_aperture_group_schedule(aperture_group: str,
 
     category = ['Shading off', 'Shading on']
 
-    shd_trans = states_schedule.header.metadata['Shade Transmittance']
+    shd_trans = states_schedule.header.metadata.get('Shade Transmittance', None)
+    if shd_trans is None:
+        hovertemplate = (
+            "<b>"
+            + aperture_group
+            + "</b><br>Month: %{customdata[0]}<br>Day: %{customdata[1]}<br>"
+            + "Hour: %{y}:00<br>"
+        )
+    else:
+        hovertemplate = (
+            "<b>"
+            + aperture_group
+            + ": %{customdata[2]} - " + "{:.0%}".format(round(shd_trans, 3))
+            + "</b><br>Month: %{customdata[0]}<br>Day: %{customdata[1]}<br>"
+            + "Hour: %{y}:00<br>"
+        )
     #df['value'] = df['value'].replace(1, 0).replace(shd_trans, 1)
     df['shading'] = [category[int(value)] for value in df['value']]
 
@@ -118,13 +133,7 @@ def figure_aperture_group_schedule(aperture_group: str,
             zmax=1,
             colorscale=[[0, "rgb(90,255,90)"], [0.5, "rgb(90,255,90)"], [0.5, "rgb(255,90,90)"], [1, "rgb(255,90,90)"]],
             customdata=np.stack((df["month_names"], df["day"], df['shading']), axis=-1),
-            hovertemplate=(
-                "<b>"
-                + aperture_group
-                + ": %{customdata[2]} - " + "{:.0%}".format(round(shd_trans, 3))
-                + "</b><br>Month: %{customdata[0]}<br>Day: %{customdata[1]}<br>"
-                + "Hour: %{y}:00<br>"
-            ),
+            hovertemplate=hovertemplate,
             name="",
             colorbar=dict(
                 tickvals=[0.25, 0.75],
@@ -140,13 +149,22 @@ def figure_aperture_group_schedule(aperture_group: str,
     fig.update_xaxes(dtick="M1", tickformat="%b", ticklabelmode="period")
     fig.update_yaxes(title_text="Hours of the day")
 
-    fig_title = {
-        'text': aperture_group + ' - Shading transmittance: ' + '{:.0%}'.format(round(shd_trans, 3)),
-        'y': 0.95,
-        'x': 0.5,
-        'xanchor': 'center',
-        'yanchor': 'top'
-    }
+    if shd_trans is None:
+        fig_title = {
+            'text': aperture_group,
+            'y': 0.95,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'
+        }
+    else:
+        fig_title = {
+            'text': aperture_group + ' - Shading transmittance: ' + '{:.0%}'.format(round(shd_trans, 3)),
+            'y': 0.95,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'
+        }
 
     fig.update_layout(
         template='plotly_white',
